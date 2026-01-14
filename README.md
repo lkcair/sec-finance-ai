@@ -6,7 +6,12 @@
 
 From the same creators of **[yfinance-ai](https://github.com/lkcair/yfinance-ai)**.
 
-🚀 OpenWebUI Automatic Installation
+
+## 🛠️ Installation
+
+### OpenWebUI Automatic (Recommended)
+
+**🚀 Easiest way - works exactly like yfinance-ai:**
 
     1. Download sec-finance-ai on the OpenWebUI Website
     2. Click on Get
@@ -17,6 +22,18 @@ From the same creators of **[yfinance-ai](https://github.com/lkcair/yfinance-ai)
     6. Start asking questions like:
         "What's Apple's latest 8K about?"
         "Compare AAPL 10K with AMZN"
+
+🚀 (Alternative) OpenWebUI Manual Installation
+
+1. Copy the entire file content: `sec_finance_ai.py`
+2. OpenWebUI → Admin Panel → Functions → Create New
+3. Paste the code
+4. Save and enable
+5. Ask: *"Get Apple's latest 10-K"* or *"Show GameStop's recent 8-K filings"*
+
+Done! All functions available in your AI assistant.
+
+
 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -51,19 +68,6 @@ From the same creators of **[yfinance-ai](https://github.com/lkcair/yfinance-ai)
 | **N-PORT** | Fund Holdings | Monthly mutual fund portfolios |
 | **ADV** | Investment Advisor | RIA registrations and updates |
 
-## 🛠️ Installation
-
-### OpenWebUI (Copy-Paste, 30 seconds)
-
-**Easiest way - works exactly like yfinance-ai:**
-
-1. Copy the entire file content: `sec_finance_ai.py`
-2. OpenWebUI → Admin Panel → Functions → Create New
-3. Paste the code
-4. Save and enable
-5. Ask: *"Get Apple's latest 10-K"* or *"Show GameStop's recent 8-K filings"*
-
-Done! All functions available in your AI assistant.
 
 ### Python Direct Usage
 ```bash
