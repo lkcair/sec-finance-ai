@@ -4,7 +4,20 @@
 
 40+ tools for accessing SEC filings directly from OpenWebUI, Claude, ChatGPT, or any AI assistant. Get 10-K, 10-Q, 8-K filings, insider trading data, company facts, and more with natural language queries.
 
-Works identically to **[yfinance-ai](https://github.com/lkcair/yfinance-ai)** - just copy the file into OpenWebUI and start asking questions.
+From the same creators of **[yfinance-ai](https://github.com/lkcair/yfinance-ai)**.
+
+🚀 OpenWebUI Automatic Installation
+
+    1. Download sec-finance-ai on the OpenWebUI Website
+    2. Click on Get
+    3. Write your OpenWebUI address for import to work.
+    4. Click on Save inside your OpenWebUI installation.
+    5. Enable on Model or on Chat (VERY IMPORTANT - Either enable the sec-finance-ai TOOL on the model itself via Admin Panel; or enable everytime on every new chat).
+    
+    6. Start asking questions like:
+        "What's Apple's latest 8K about?"
+        "Compare AAPL 10K with AMZN"
+
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -256,11 +269,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **GitHub Issues** - Bug reports and feature requests
 - **Discussions** - General questions and community support
-- **Sponsor** - Support development at [GitHub Sponsors](https://github.com/sponsors/lucas0)
+- **Sponsor** - Support development at [GitHub Sponsors](https://github.com/sponsors/lkcair)
 
 ## 🔗 Related Projects
 
-- **[yfinance-ai](https://github.com/lucas0/yfinance-ai)** - Yahoo Finance integration for AI assistants
+- **[yfinance-ai](https://github.com/lkcair/yfinance-ai)** - Yahoo Finance integration for AI assistants
 - **[SEC EDGAR API](https://www.sec.gov/edgar/sec-api-documentation)** - Official SEC API documentation
 
 ---
