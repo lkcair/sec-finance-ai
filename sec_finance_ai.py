@@ -643,36 +643,32 @@ class Tools:
     @rate_limit()
     async def get_latest_10k(self, ticker: str) -> Dict[str, Any]:
         """
-        Get the latest 10-K filing for a company.
+        Get the latest 10-K filing for a company with content.
 
         Args:
             ticker: Stock ticker symbol
 
         Returns:
-            Dictionary containing 10-K filing information
+            Dictionary containing 10-K filing with content preview
         """
         logger.info(f"=== get_latest_10k({ticker}) ===")
         result = await self.get_company_filings(ticker, form_type="10-K", limit=1)
-        
-        if "error" in result:
+
+        if "error" in result or not result.get("filings"):
             return result
-            
-        if not result.get("filings"):
-            return {"error": "No 10-K filings found"}
-            
+
         latest_10k = result["filings"][0]
-        
-        # Try to get additional content
+
+        # Extract content
         try:
-            filing_url = latest_10k["filing_url"]
-            response = self.session.get(filing_url, timeout=30)
+            response = self.session.get(latest_10k["filing_url"], timeout=30)
             if response.status_code == 200:
-                # Extract some key sections
                 content = extract_text_from_html(response.text, max_length=10000)
                 latest_10k["content_preview"] = content
-        except:
-            pass
-            
+                logger.info(f"✓ Retrieved 10-K content")
+        except Exception as e:
+            logger.debug(f"Could not extract content: {e}")
+
         return {
             "ticker": result["ticker"],
             "company_name": result["company_name"],
@@ -683,35 +679,32 @@ class Tools:
     @rate_limit()
     async def get_latest_10q(self, ticker: str) -> Dict[str, Any]:
         """
-        Get the latest 10-Q filing for a company.
+        Get the latest 10-Q filing for a company with content.
 
         Args:
             ticker: Stock ticker symbol
 
         Returns:
-            Dictionary containing 10-Q filing information
+            Dictionary containing 10-Q filing with content preview
         """
         logger.info(f"=== get_latest_10q({ticker}) ===")
         result = await self.get_company_filings(ticker, form_type="10-Q", limit=1)
-        
-        if "error" in result:
+
+        if "error" in result or not result.get("filings"):
             return result
-            
-        if not result.get("filings"):
-            return {"error": "No 10-Q filings found"}
-            
+
         latest_10q = result["filings"][0]
-        
-        # Try to get additional content
+
+        # Extract content
         try:
-            filing_url = latest_10q["filing_url"]
-            response = self.session.get(filing_url, timeout=30)
+            response = self.session.get(latest_10q["filing_url"], timeout=30)
             if response.status_code == 200:
                 content = extract_text_from_html(response.text, max_length=10000)
                 latest_10q["content_preview"] = content
-        except:
-            pass
-            
+                logger.info(f"✓ Retrieved 10-Q content")
+        except Exception as e:
+            logger.debug(f"Could not extract content: {e}")
+
         return {
             "ticker": result["ticker"],
             "company_name": result["company_name"],
@@ -722,17 +715,142 @@ class Tools:
     @rate_limit()
     async def get_recent_8k_filings(self, ticker: str, limit: int = 5) -> Dict[str, Any]:
         """
-        Get recent 8-K filings for a company.
+        Get recent 8-K filings for a company with content extraction.
 
         Args:
             ticker: Stock ticker symbol
             limit: Number of recent 8-K filings to return
 
         Returns:
-            Dictionary containing 8-K filing information
+            Dictionary containing 8-K filing information including content preview
         """
         logger.info(f"=== get_recent_8k_filings({ticker}, limit={limit}) ===")
-        return await self.get_company_filings(ticker, form_type="8-K", limit=limit)
+        result = await self.get_company_filings(ticker, form_type="8-K", limit=limit)
+
+        if "error" in result or "filings" not in result:
+            return result
+
+        # Extract content from each 8-K filing
+        enhanced_filings = []
+        for filing in result.get("filings", []):
+            enhanced_filing = filing.copy()
+
+            try:
+                filing_url = filing["filing_url"]
+                logger.debug(f"Fetching 8-K content from: {filing_url}")
+                response = self.session.get(filing_url, timeout=30)
+                if response.status_code == 200:
+                    # Extract text content from HTML
+                    content = extract_text_from_html(response.text, max_length=5000)
+                    enhanced_filing["content_preview"] = content
+
+                    # Try to extract key event items (Item 1-9 of 8-K)
+                    try:
+                        soup = BeautifulSoup(response.text, 'html.parser')
+                        # Look for Item headers in 8-K
+                        item_text = soup.get_text()
+                        if "Item" in item_text:
+                            enhanced_filing["has_event_details"] = True
+                    except:
+                        pass
+
+                    logger.info(f"✓ Extracted content for {filing['filing_date']}")
+            except Exception as e:
+                logger.debug(f"Could not extract 8-K content: {e}")
+
+            enhanced_filings.append(enhanced_filing)
+
+        result["filings"] = enhanced_filings
+        return result
+
+    def _extract_8k_summary(self, text: str) -> Dict[str, Any]:
+        """Extract key information from 8-K plain text."""
+        lines = text.split('\n')
+        summary = {
+            "events": [],
+            "key_text": ""
+        }
+
+        # Look for Item entries (simplified)
+        in_content = False
+        content_lines = []
+
+        for i, line in enumerate(lines):
+            line = line.strip()
+
+            # Detect important items
+            if line.startswith("Item 2."):
+                summary["events"].append("Material change or acquisition")
+            elif line.startswith("Item 3."):
+                summary["events"].append("Corporate governance change")
+            elif line.startswith("Item 5."):
+                summary["events"].append("Executive or director change")
+            elif line.startswith("Item 8."):
+                summary["events"].append("Regulatory/other event")
+            elif line and not line.startswith("Item") and len(line) > 20:
+                content_lines.append(line)
+
+        # Get summary text (first meaningful paragraph)
+        if content_lines:
+            summary["key_text"] = " ".join(content_lines[:5])[:500]
+
+        return summary
+
+    @safe_sec_call
+    @rate_limit()
+    async def analyze_8k_filing(self, ticker: str) -> Dict[str, Any]:
+        """
+        Get and summarize the latest 8-K filing for a company.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Dictionary containing 8-K summary with actual content
+        """
+        logger.info(f"=== analyze_8k_filing({ticker}) ===")
+
+        # Get latest 8-K
+        filings_result = await self.get_company_filings(ticker, form_type="8-K", limit=1)
+
+        if "error" in filings_result or not filings_result.get("filings"):
+            return {"error": "Could not find 8-K filings"}
+
+        filing = filings_result["filings"][0]
+
+        try:
+            # Get filing content
+            filing_url = filing["filing_url"]
+            logger.info(f"Fetching 8-K: {filing_url}")
+            response = self.session.get(filing_url, timeout=30)
+
+            if response.status_code != 200:
+                return {"error": f"Could not access filing: HTTP {response.status_code}"}
+
+            # Extract text
+            content = extract_text_from_html(response.text, max_length=5000)
+            summary = self._extract_8k_summary(content)
+
+            logger.info(f"✓ 8-K analyzed for {filing['filing_date']}")
+
+            return {
+                "ticker": ticker,
+                "company_name": filings_result.get("company_name"),
+                "filing_date": filing["filing_date"],
+                "filing_url": filing["filing_url"],
+                "accession": filing["accession_number"],
+                "events": summary["events"],
+                "summary": summary["key_text"],
+                "content_preview": content
+            }
+
+        except Exception as e:
+            logger.error(f"Error analyzing 8-K: {e}")
+            return {
+                "error": f"Failed to analyze: {str(e)}",
+                "filing_date": filing.get("filing_date"),
+                "filing_url": filing.get("filing_url")
+            }
 
     @safe_sec_call
     @rate_limit()
