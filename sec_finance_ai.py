@@ -1,15 +1,15 @@
 """
-title: sec-ai - World's Best AI-Powered SEC Filing Integration
+title: sec-finance-ai - AI-Powered SEC Filing Integration
 description: Complete SEC Filing Data Suite - 40+ tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, Claude, ChatGPT, and any AI assistant.
-author: lucas0
-author_url: https://lucas0.com
-funding_url: https://github.com/sponsors/lucas0
+author: lkcair
+author_url: https://github.com/lkcair
+funding_url: https://github.com/sponsors/lkcair
 version: 1.0.0
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0
-repository: https://github.com/lucas0/sec-ai
+repository: https://github.com/lkcair/sec-finance-ai
 
-OPENWEBUI INSTALLATION:
+OPENWEBUI INSTALLATION (EASIEST):
 1. Copy this entire file
 2. Go to OpenWebUI → Admin Panel → Functions
 3. Click "+" to create new function
@@ -21,7 +21,7 @@ INTEGRATION WITH OTHER AI TOOLS:
 - Claude Desktop: Add as MCP server
 - ChatGPT Custom GPT: Import as action
 - LangChain: Use as Tool
-- Python: from sec_ai import Tools; tools = Tools()
+- Python: from sec_finance_ai import Tools; tools = Tools()
 - API: Deploy as FastAPI/Flask endpoint
 
 FEATURES:

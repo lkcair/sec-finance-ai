@@ -1,8 +1,10 @@
-# SEC-AI 🏛️📊
+# sec-finance-ai 📊💼
 
-**World's Best AI-Powered SEC Filing Integration**
+**AI-Powered SEC Filing Integration for Your AI Assistant**
 
-Complete SEC Filing Data Suite with 40+ tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, Claude, ChatGPT, and any AI assistant.
+40+ tools for accessing SEC filings directly from OpenWebUI, Claude, ChatGPT, or any AI assistant. Get 10-K, 10-Q, 8-K filings, insider trading data, company facts, and more with natural language queries.
+
+Works identically to **[yfinance-ai](https://github.com/lkcair/yfinance-ai)** - just copy the file into OpenWebUI and start asking questions.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -38,41 +40,33 @@ Complete SEC Filing Data Suite with 40+ tools for 10-K, 10-Q, 8-K, proxy stateme
 
 ## 🛠️ Installation
 
-### OpenWebUI (Recommended)
-1. Copy the entire `sec_ai.py` file
-2. Go to OpenWebUI → Admin Panel → Functions
-3. Click "+" to create new function
-4. Paste the code and save
-5. Enable the function
-6. Start asking: *"Get Apple's latest 10-K filing"*
+### OpenWebUI (Copy-Paste, 30 seconds)
+
+**Easiest way - works exactly like yfinance-ai:**
+
+1. Copy the entire file content: `sec_finance_ai.py`
+2. OpenWebUI → Admin Panel → Functions → Create New
+3. Paste the code
+4. Save and enable
+5. Ask: *"Get Apple's latest 10-K"* or *"Show GameStop's recent 8-K filings"*
+
+Done! All functions available in your AI assistant.
 
 ### Python Direct Usage
 ```bash
-pip install sec-edgar-api pandas pydantic requests beautifulsoup4 lxml
+pip install pandas pydantic requests beautifulsoup4 lxml python-dateutil
 ```
 
 ```python
-from sec_ai import Tools
+from sec_finance_ai import Tools
+import asyncio
 
-# Initialize SEC-AI
-tools = Tools()
+async def example():
+    tools = Tools()
+    result = await tools.get_recent_8k_filings("GME")
+    print(result)
 
-# Get latest 10-K filing
-result = await tools.get_latest_10k("AAPL")
-print(result)
-```
-
-### Claude Desktop MCP
-Add to your Claude Desktop configuration:
-```json
-{
-  "mcpServers": {
-    "sec-ai": {
-      "command": "python",
-      "args": ["/path/to/sec_ai.py"]
-    }
-  }
-}
+asyncio.run(example())
 ```
 
 ## 📖 Usage Examples
