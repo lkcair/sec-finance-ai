@@ -4,7 +4,7 @@ description: Complete SEC Filing Data Suite - 40+ tools for 10-K, 10-Q, 8-K, pro
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 1.0.0
+version: 1.1.0
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0
 repository: https://github.com/lkcair/sec-finance-ai
@@ -74,10 +74,14 @@ import requests
 import logging
 import re
 import time
+import asyncio
 import json
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, quote
 import xml.etree.ElementTree as ET
+
+# Direct SEC EDGAR API approach - no external library needed
+# Using requests library to fetch .txt versions directly from SEC
 
 # ============================================================
 # CONFIGURATION & CONSTANTS
@@ -92,9 +96,11 @@ SEC_API_BASE = "https://data.sec.gov"
 SEC_EDGAR_BASE = "https://www.sec.gov/Archives/edgar/data"
 
 # User agent required by SEC (must include company name and email)
+# SEC blocks requests without proper User-Agent per their policy
 SEC_HEADERS = {
-    "User-Agent": "SEC-AI Tool 1.0 (lucas0@example.com)",
-    "Accept-Encoding": "gzip, deflate"
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0",
+    "Accept-Encoding": "gzip, deflate",
+    "Accept": "*/*"
 }
 
 # SEC Form Types
@@ -355,7 +361,7 @@ def retry_with_backoff(max_retries: int = 3, base_wait: float = 1.0, max_wait: f
                     if attempt < max_retries - 1:
                         wait_time = min(base_wait * (2 ** attempt), max_wait)
                         logger.warning(f"Retry {attempt + 1}/{max_retries} for {func.__name__} after {wait_time}s: {e}")
-                        time.sleep(wait_time)
+                        await asyncio.sleep(wait_time)
                     else:
                         logger.error(f"Failed after {max_retries} attempts: {func.__name__}")
                 except Exception as e:
@@ -372,7 +378,7 @@ def rate_limit():
         @wraps(func)
         async def wrapper(*args, **kwargs):
             # Simple rate limiting - wait 0.1 seconds between calls
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
             return await func(*args, **kwargs)
         return wrapper
     return decorator
@@ -387,7 +393,7 @@ def safe_sec_call(func):
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
                 logger.warning("Rate limit exceeded, waiting...")
-                time.sleep(1)
+                await asyncio.sleep(1)
                 return await func(self, *args, **kwargs)
             else:
                 logger.error(f"HTTP error in {func.__name__}: {e}")
@@ -1349,13 +1355,335 @@ class Tools:
         return test_results
 
     # ============================================================
-    # OPENWEBUI INTEGRATION FUNCTIONS
+    # METRIC DISCOVERY & FILTERING TOOLS
     # ============================================================
+
+    @safe_sec_call
+    @rate_limit()
+    async def get_available_metrics(self, ticker: str, search_term: str = None) -> Dict[str, Any]:
+        """
+        Discover available financial metrics for a company from SEC XBRL data.
+
+        This function lists ALL available metrics that can be requested via specific_metrics.
+        Useful for AI to find exactly which metrics are available before requesting them.
+
+        Args:
+            ticker: Stock ticker symbol (e.g., 'GME', 'AAPL')
+            search_term: Optional search term to filter metrics (e.g., 'EBITDA', 'Revenue', 'Debt')
+
+        Returns:
+            Dict containing:
+            - all_metrics: List of ALL available metric names
+            - filtered_metrics: List of metrics matching search_term (if provided)
+            - metric_categories: Organized by category (income, balance_sheet, cash_flow, etc)
+            - total_available: Total number of available metrics
+            - example_ttm_metrics: Example metrics useful for TTM calculations
+        """
+        try:
+            logger.info(f"Discovering metrics for {ticker}...")
+
+            # Get CIK (ticker_to_cik is a regular function, not async - returns CIK string or None)
+            cik = self.ticker_to_cik(ticker)
+            if not cik:
+                return {"error": f"Failed to find CIK for ticker {ticker}"}
+
+            # Get all available metrics from SEC API
+            facts_url = f"{SEC_API_BASE}/api/xbrl/companyfacts/CIK{cik}.json"
+            response = self.session.get(facts_url, timeout=30)
+            response.raise_for_status()
+
+            data = response.json()
+            us_gaap = data.get("facts", {}).get("us-gaap", {})
+            all_metrics = sorted(list(us_gaap.keys()))
+
+            # Categorize metrics based on naming patterns
+            categories = {
+                "income_statement": [],
+                "balance_sheet": [],
+                "cash_flow": [],
+                "earnings_per_share": [],
+                "shares_and_stock": [],
+                "segment_data": [],
+                "other": []
+            }
+
+            income_keywords = ["Income", "Loss", "Revenues", "Expense", "Earnings", "Operating", "Gross"]
+            balance_keywords = ["Assets", "Liabilities", "Equity", "Stockholders", "Payable", "Receivable"]
+            cashflow_keywords = ["CashFlow", "Cash", "Depreciation", "Amortization"]
+            eps_keywords = ["EPS", "EarningsPerShare", "Weighted"]
+            shares_keywords = ["Shares", "Outstanding", "Stock"]
+            segment_keywords = ["Segment"]
+
+            for metric in all_metrics:
+                categorized = False
+
+                for keyword in income_keywords:
+                    if keyword.lower() in metric.lower():
+                        categories["income_statement"].append(metric)
+                        categorized = True
+                        break
+
+                if not categorized:
+                    for keyword in balance_keywords:
+                        if keyword.lower() in metric.lower():
+                            categories["balance_sheet"].append(metric)
+                            categorized = True
+                            break
+
+                if not categorized:
+                    for keyword in cashflow_keywords:
+                        if keyword.lower() in metric.lower():
+                            categories["cash_flow"].append(metric)
+                            categorized = True
+                            break
+
+                if not categorized:
+                    for keyword in eps_keywords:
+                        if keyword.lower() in metric.lower():
+                            categories["earnings_per_share"].append(metric)
+                            categorized = True
+                            break
+
+                if not categorized:
+                    for keyword in shares_keywords:
+                        if keyword.lower() in metric.lower():
+                            categories["shares_and_stock"].append(metric)
+                            categorized = True
+                            break
+
+                if not categorized:
+                    for keyword in segment_keywords:
+                        if keyword.lower() in metric.lower():
+                            categories["segment_data"].append(metric)
+                            categorized = True
+                            break
+
+                if not categorized:
+                    categories["other"].append(metric)
+
+            # Filter by search term if provided
+            filtered_metrics = []
+            if search_term:
+                search_lower = search_term.lower()
+                filtered_metrics = [m for m in all_metrics if search_lower in m.lower()]
+                logger.info(f"Found {len(filtered_metrics)} metrics matching '{search_term}'")
+
+            # Common TTM calculation metrics
+            ttm_example_metrics = [
+                "NetIncomeLoss",
+                "Revenues",
+                "InterestExpense",
+                "IncomeTaxExpenseBenefit",
+                "OperatingIncomeLoss",
+                "DepreciationDepletionAndAmortization",
+                "GrossProfit",
+                "OperatingExpenses"
+            ]
+
+            result = {
+                "ticker": ticker,
+                "company_name": data.get("entityName", ticker),
+                "total_available": len(all_metrics),
+                "all_metrics": all_metrics,
+                "categories": {k: v for k, v in categories.items() if v},
+                "category_counts": {k: len(v) for k, v in categories.items() if v},
+                "data_source": "SEC EDGAR XBRL",
+                "discovery_timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                "usage_tips": {
+                    "generic_mode": "Call get_filing_content() without specific_metrics to get 13 essential metrics (default, token-efficient)",
+                    "specific_mode": "Call get_filing_content() with specific_metrics=['MetricName1', 'MetricName2', ...] to get only what you need",
+                    "ttm_calculation": "For TTM calculations, use specific_metrics with these: " + str(ttm_example_metrics),
+                    "metric_search": "Use get_available_metrics(ticker='GME', search_term='EBITDA') to find related metrics"
+                }
+            }
+
+            if filtered_metrics:
+                result["filtered_metrics"] = filtered_metrics
+                result["filtered_count"] = len(filtered_metrics)
+
+            logger.info(f"✓ Found {len(all_metrics)} total metrics for {ticker}")
+            return result
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"SEC API failed: {e}")
+            return {"error": f"SEC API failed: {str(e)}", "ticker": ticker}
+        except Exception as e:
+            logger.error(f"Error discovering metrics: {e}", exc_info=True)
+            return {"error": str(e), "ticker": ticker}
+
+    @safe_sec_call
+    @rate_limit()
+    async def get_filing_content(self, ticker: str, filing_type: str = None, get_full_content: bool = False, specific_metrics: list = None) -> Optional[Dict[str, Any]]:
+        """
+        Get SEC financial data - SMART & EFFICIENT dual-mode approach.
+
+        ╔════════════════════════════════════════════════════════════════════╗
+        ║  GENERIC MODE (no specific_metrics parameter)                      ║
+        ║  - Returns 13 essential metrics for any financial analysis         ║
+        ║  - 5 historical values per metric (sufficient for TTM calc)        ║
+        ║  - Most token-efficient for general questions                      ║
+        ║  - Includes: Net Income, Revenues, Interest Expense, Taxes,        ║
+        ║    Operating Income, Gross Profit, Assets, Liabilities, Equity,   ║
+        ║    Depreciation, Shares Outstanding, Cash, Long-term Debt         ║
+        ╚════════════════════════════════════════════════════════════════════╝
+
+        ╔════════════════════════════════════════════════════════════════════╗
+        ║  SPECIFIC MODE (provide specific_metrics parameter)                ║
+        ║  - Returns ONLY the requested metrics you specify                  ║
+        ║  - Perfect for targeted analysis (TTM EBITDA, leverage ratios)    ║
+        ║  - Minimal token usage - only fetch what you need                  ║
+        ║  - Example: ['NetIncomeLoss', 'DepreciationDepletionAndAmortization',║
+        ║    'InterestExpense', 'IncomeTaxExpenseBenefit']                   ║
+        ║  - Use get_available_metrics(ticker) to discover all metrics      ║
+        ╚════════════════════════════════════════════════════════════════════╝
+
+        WORKFLOW FOR TTM CALCULATIONS:
+        1. Call: get_available_metrics(ticker='GME', search_term='Depreciation')
+        2. Find needed metrics from results
+        3. Call: get_filing_content(ticker='GME', specific_metrics=['NetIncomeLoss', ...])
+        4. Calculate TTM from 5 historical values (last 4 quarters + 1 prior)
+
+        FILE HANDLING:
+        - Files <1MB: Automatically downloaded and returned in full_content field
+        - Files ≥1MB: Link provided to user, AI warned via ai_note field
+        - Keep filing_url for user manual download if needed
+
+        Args:
+            ticker: Stock ticker symbol (e.g., 'GME', 'AAPL')
+            filing_type: Type of filing - '10-Q', '10-K', '8-K', etc. (None = get latest)
+            get_full_content: If True, check and optionally download full filing text
+            specific_metrics: List of specific metric names to fetch.
+                            If None, returns 13 essential metrics (generic mode).
+                            Example: ['NetIncomeLoss', 'Revenues', 'DepreciationDepletionAndAmortization']
+                            Use get_available_metrics() to discover what's available.
+
+        Returns:
+            Dict containing:
+            - ticker, cik, company_name: Company identification
+            - financial_metrics: Dict of requested/essential metrics with 5 historical values each
+            - filing_date, filing_type: Filing metadata
+            - mode: "generic" or "specific"
+            - metrics_returned, values_per_metric: Data shape info
+            - full_content: (if file <1MB) Complete filing text for analysis
+            - file_size_mb, filing_url: (if file ≥1MB) Link and size info + ai_note warning
+            - ai_note: (if file too large) Explicit warning for AI explaining situation
+        """
+        try:
+            logger.info(f"Fetching SEC data for {ticker}...")
+
+            # Step 1: Get filings metadata
+            filings_result = await self.get_company_filings(ticker, form_type=filing_type, limit=1)
+
+            if "error" in filings_result:
+                return {"error": f"Failed to fetch filings: {filings_result.get('error')}"}
+
+            cik = filings_result.get("cik")
+            company_name = filings_result.get("company_name")
+
+            # Step 2: Get financial data but ONLY keep requested/essential metrics (save tokens)
+            facts_url = f"{SEC_API_BASE}/api/xbrl/companyfacts/CIK{cik}.json"
+            logger.info(f"Fetching financial metrics...")
+
+            response = self.session.get(facts_url, timeout=30)
+            response.raise_for_status()
+
+            raw_financial_data = response.json()
+
+            # Determine which metrics to fetch
+            if specific_metrics:
+                # AI requested specific metrics only (save maximum tokens)
+                metrics_to_fetch = specific_metrics
+                logger.info(f"Specific mode: Fetching {len(metrics_to_fetch)} requested metrics")
+            else:
+                # Generic mode: Return essentials for any question
+                metrics_to_fetch = [
+                    "NetIncomeLoss", "Revenues", "InterestExpense",
+                    "IncomeTaxExpenseBenefit", "OperatingIncomeLoss",
+                    "GrossProfit", "Assets", "Liabilities", "StockholdersEquity",
+                    "DepreciationDepletionAndAmortization", "CommonStockSharesOutstanding",
+                    "CashAndCashEquivalentsAtCarryingValue", "LongTermDebt"
+                ]
+                logger.info(f"Generic mode: Fetching {len(metrics_to_fetch)} essential metrics")
+
+            us_gaap = raw_financial_data.get("facts", {}).get("us-gaap", {})
+            financial_data_slim = {}
+
+            for metric in metrics_to_fetch:
+                if metric in us_gaap:
+                    metric_info = us_gaap[metric].copy()
+                    if "units" in metric_info and "USD" in metric_info["units"]:
+                        # Keep last 5 values for proper TTM calculations
+                        metric_info["units"]["USD"] = metric_info["units"]["USD"][-5:]
+                    financial_data_slim[metric] = metric_info
+
+            logger.info(f"✓ Kept {len(financial_data_slim)} metrics (last 5 values each)")
+
+            # Step 3: Build base response (lean)
+            response_data = {
+                "ticker": ticker,
+                "cik": cik,
+                "company_name": company_name,
+                "financial_metrics": financial_data_slim,
+                "filing_date": filings_result.get("filings", [{}])[0].get("filing_date"),
+                "filing_type": filing_type or "Latest",
+                "data_source": "SEC EDGAR API",
+                "mode": "specific" if specific_metrics else "generic",
+                "metrics_returned": len(financial_data_slim),
+                "values_per_metric": 5
+            }
+
+            # Step 4: Handle full content request
+            if get_full_content and filings_result.get("filings"):
+                latest_filing = filings_result["filings"][0]
+                filing_url = latest_filing.get("filing_url")
+
+                logger.info(f"Checking filing size...")
+
+                try:
+                    # Check size WITHOUT downloading
+                    head_response = self.session.head(filing_url, timeout=10)
+                    file_size = int(head_response.headers.get('content-length', 0))
+                    MAX_FILE_SIZE = 1024 * 1024  # 1MB limit
+
+                    logger.info(f"Filing size: {file_size} bytes")
+
+                    if file_size >= MAX_FILE_SIZE:
+                        # File >= 1MB - just give link and warn AI
+                        response_data["filing_url"] = filing_url
+                        response_data["file_size_mb"] = round(file_size / (1024 * 1024), 2)
+                        response_data["file_too_large"] = True
+                        response_data["ai_note"] = f"⚠️ NOTICE: The {filing_type} filing for {company_name} is {response_data['file_size_mb']}MB, which exceeds our 1MB processing limit. We've sent the user a link to download the full filing directly from SEC EDGAR. The user should download and analyze it manually, then provide you with the specific data/calculations needed. Link: {filing_url}"
+                        response_data["note"] = f"Filing is {response_data['file_size_mb']}MB (>=1MB limit). Download: {filing_url}"
+                    else:
+                        # File < 1MB - download and read
+                        logger.info(f"Downloading filing ({file_size} bytes)...")
+                        content_response = self.session.get(filing_url, timeout=30)
+                        content_response.raise_for_status()
+
+                        content = content_response.text
+                        response_data["full_content"] = content
+                        response_data["content_size_kb"] = round(len(content) / 1024, 2)
+                        logger.info(f"✓ Read {response_data['content_size_kb']}KB")
+
+                except Exception as e:
+                    logger.error(f"Error checking file size: {e}")
+                    response_data["filing_url"] = filing_url
+                    response_data["note"] = f"Could not check size. Link: {filing_url}"
+
+            logger.info(f"✓ Response ready")
+            return response_data
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"SEC API failed: {e}")
+            return {"error": f"SEC API failed: {str(e)}", "ticker": ticker}
+        except Exception as e:
+            logger.error(f"Error: {e}", exc_info=True)
+            return {"error": str(e), "ticker": ticker}
 
     def get_available_functions(self) -> List[Dict[str, Any]]:
         """
         Get list of all available SEC-AI functions for OpenWebUI integration.
-        
+
         Returns:
             List of function definitions
         """
@@ -1433,6 +1761,14 @@ class Tools:
                 }
             },
             {
+                "name": "get_available_metrics",
+                "description": "Discover and search all available financial metrics for a company from SEC XBRL data. Use this to find metric names before calling get_filing_content with specific_metrics.",
+                "parameters": {
+                    "ticker": "Stock ticker symbol (required)",
+                    "search_term": "Optional search term to filter metrics (e.g., 'EBITDA', 'Revenue', 'Debt', 'Cash')"
+                }
+            },
+            {
                 "name": "search_filings",
                 "description": "Search SEC filings by company name or criteria",
                 "parameters": {
@@ -1447,6 +1783,14 @@ class Tools:
                 "name": "get_sec_api_status",
                 "description": "Check SEC API status and connectivity",
                 "parameters": {}
+            },
+            {
+                "name": "get_filing_content",
+                "description": "Download full text content of a SEC filing using sec-edgar library",
+                "parameters": {
+                    "ticker": "Stock ticker symbol (required)",
+                    "filing_type": "Type of filing - 10-Q, 10-K, 8-K (default: 10-Q)"
+                }
             },
             {
                 "name": "run_self_test",
@@ -1502,6 +1846,10 @@ async def get_company_concept(ticker: str, concept: str) -> dict:
     """Get specific financial concept data for a company"""
     return await tools.get_company_concept(ticker, concept)
 
+async def get_available_metrics(ticker: str, search_term: str = None) -> dict:
+    """Discover all available financial metrics for a company from SEC XBRL data"""
+    return await tools.get_available_metrics(ticker, search_term)
+
 async def search_filings(query: str, form_type: str = None, start_date: str = None, end_date: str = None, limit: int = 20) -> dict:
     """Search SEC filings by company name or criteria"""
     return await tools.search_filings(query, form_type, start_date, end_date, limit)
@@ -1509,6 +1857,34 @@ async def search_filings(query: str, form_type: str = None, start_date: str = No
 async def get_sec_api_status() -> dict:
     """Check SEC API status and connectivity"""
     return await tools.get_sec_api_status()
+
+async def get_filing_content(ticker: str, filing_type: str = "10-Q", get_full_content: bool = False, specific_metrics: list = None) -> dict:
+    """
+    Get SEC financial data - SMART dual-mode approach.
+
+    GENERIC MODE (no specific_metrics):
+    - Returns 13 essential metrics with 5 historical values each
+    - Most token-efficient for general financial analysis
+    - Default behavior when specific_metrics not provided
+
+    SPECIFIC MODE (provide specific_metrics):
+    - Returns ONLY the metrics you specify with 5 historical values each
+    - Perfect for TTM calculations, leverage ratios, custom analysis
+    - Minimal token usage - only fetch what you actually need
+    - Example: specific_metrics=['NetIncomeLoss', 'InterestExpense', 'DepreciationDepletionAndAmortization']
+
+    FILE HANDLING:
+    - If get_full_content=True and file <1MB: Returns full text in full_content field
+    - If get_full_content=True and file ≥1MB: Provides filing_url + ai_note warning to user
+    - Always includes financial metrics via get_available_metrics() discovery
+
+    WORKFLOW:
+    1. Get available metrics: get_available_metrics(ticker='GME', search_term='Depreciation')
+    2. Request specific data: get_filing_content(ticker='GME', specific_metrics=['NetIncomeLoss', 'InterestExpense', ...])
+    3. Calculate TTM using 5 historical values per metric
+    """
+    result = await tools.get_filing_content(ticker, filing_type, get_full_content, specific_metrics)
+    return result if result else {"error": f"Failed to fetch {filing_type} for {ticker}"}
 
 async def run_self_test() -> dict:
     """Run comprehensive self-test of all SEC-AI tools"""
