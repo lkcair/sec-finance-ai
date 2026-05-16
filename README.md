@@ -23,6 +23,7 @@
 ---
 # Star the Github or the Skill if you like it.
 **Repository**: https://github.com/lkcair/sec-finance-ai
+
 Also, try [yfinance-ai](https://github.com/lkcair/yfinance-ai) for stocks and crypto data.
 
 # 🚀 Quick Start
@@ -33,6 +34,10 @@ openclaw skills install sec
 On OpenClaw, start asking questions like:
    - "What's Apple's latest 10-K about?"
    - "Get beneficial ownership reports for GME"
+
+Skill page: [Openclaw SEC](https://clawhub.ai/lkcair/sec)
+
+- **(Alternative) OpenClaw Manual**: Download Skill at [https://clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec) and upload manually to OpenClaw skills location.
 
 ## 🚀 OpenWebUI (Main) Automatic Installation
 1. Download `sec-finance-ai` on the [OpenWebUI Website](https://openwebui.com/posts/fc928bb1-1ae8-462d-a4c1-ae5ede39aaa7)
