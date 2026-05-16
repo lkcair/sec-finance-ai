@@ -6,7 +6,7 @@
 
 **Author**: lucas0
 
-**Github**: [Github](https://github.com/lkcair/sec-finance-ai)
+**Github**: [Github](https://github.com/lkcair/)
 
 **Version**: 1.2.0
 
@@ -16,23 +16,25 @@
 
 **Repository**: https://github.com/lkcair/sec-finance-ai
 
-**OpenWebUI Page**: Download sec-finance-ai on the [OpenWebUI Website](https://openwebui.com/posts/sec-finance-ai-filing-data-integration)
+**OpenWebUI Page**: Download sec-finance-ai on the [OpenWebUI Website](https://openwebui.com/posts/fc928bb1-1ae8-462d-a4c1-ae5ede39aaa7)
 
-**OpenClaw Page**: [https://clawhub.ai/lkcair/sec-finance-ai](https://clawhub.ai/lkcair/sec-finance-ai)
+**OpenClaw Page**: [https://clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec)
 
 ---
+# Star the Github or the Skill if you like it.
+**Repository**: https://github.com/lkcair/sec-finance-ai
 
 # 🚀 Quick Start
 ## 🦞 (Main) Installation with OpenClaw
 ```bash
-openclaw skills install sec-finance-ai
+openclaw skills install sec
 ```
 On OpenClaw, start asking questions like:
    - "What's Apple's latest 10-K about?"
    - "Get beneficial ownership reports for GME"
 
 ## 🚀 OpenWebUI (Main) Automatic Installation
-1. Download `sec-finance-ai` on the [OpenWebUI Website](https://openwebui.com/posts/sec-finance-ai-filing-data-integration)
+1. Download `sec-finance-ai` on the [OpenWebUI Website](https://openwebui.com/posts/fc928bb1-1ae8-462d-a4c1-ae5ede39aaa7)
 2. Click on **Get**
 3. Select your OpenWebUI instance.
 4. Click on **Save** inside your OpenWebUI installation.
