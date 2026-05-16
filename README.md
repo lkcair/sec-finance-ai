@@ -23,6 +23,7 @@
 ---
 # Star the Github or the Skill if you like it.
 **Repository**: https://github.com/lkcair/sec-finance-ai
+Also, try [yfinance-ai](https://github.com/lkcair/yfinance-ai) for stocks and crypto data.
 
 # 🚀 Quick Start
 ## 🦞 (Main) Installation with OpenClaw
