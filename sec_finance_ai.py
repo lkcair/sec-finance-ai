@@ -4,14 +4,14 @@ description: Complete SEC Filing Data Suite - 40+ tools for 10-K, 10-Q, 8-K, pro
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 1.1.0
+version: 1.2.0
 license: MIT
-requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0
+requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
 
-OPENWEBUI INSTALLATION (EASIEST):
+OPENWEBUI INSTALLATION:
 1. Copy this entire file
-2. Go to OpenWebUI → Admin Panel → Functions
+2. Go to OpenWebUI - Admin Panel - Functions
 3. Click "+" to create new function
 4. Paste this code
 5. Save and enable
@@ -25,25 +25,31 @@ INTEGRATION WITH OTHER AI TOOLS:
 - API: Deploy as FastAPI/Flask endpoint
 
 FEATURES:
-✅ 40+ SEC filing access tools - the most comprehensive SEC integration
-✅ Multi-filing support: 10-K, 10-Q, 8-K, DEF 14A, S-1, and more
-✅ Real-time SEC filing notifications and searches
-✅ Company facts and financial data from SEC XBRL
-✅ Insider trading and ownership data (Forms 3, 4, 5)
-✅ Institutional holdings (13F filings)
-✅ Executive compensation data
-✅ Risk factors and MD&A extraction
-✅ Financial statement parsing and analysis
-✅ SEC comment letters and responses
-✅ Mutual fund holdings (N-PORT, N-Q)
-✅ Investment advisor filings (ADV)
-✅ Beneficial ownership reports (13D, 13G)
-✅ Tender offers and merger documents
-✅ Bulk operations and company comparisons
-✅ Built-in self-testing for validation
-✅ Retry logic with exponential backoff
-✅ Rate limiting protection (SEC guidelines compliant)
-✅ Natural language query support
+- 40+ SEC filing access tools - the most comprehensive SEC integration
+- Multi-filing support: 10-K, 10-Q, 8-K, DEF 14A, S-1, and more
+- Real-time SEC filing notifications and searches
+- Company facts and financial data from SEC XBRL
+- Insider trading and ownership data (Forms 3, 4, 5)
+- Institutional holdings (13F filings)
+- Executive compensation data
+- Risk factors and MD&A extraction
+- Financial statement parsing and analysis
+- SEC comment letters and responses
+- Mutual fund holdings (N-PORT, N-Q)
+- Investment advisor filings (ADV)
+- Beneficial ownership reports (13D, 13G)
+- Tender offers and merger documents
+- Bulk operations and company comparisons
+- Built-in self-testing for validation
+- Retry logic with exponential backoff
+- Rate limiting protection (SEC guidelines compliant)
+- Natural language query support
+
+CRITICAL: SEC USER-AGENT REQUIREMENT
+The SEC requires all programmatic requests to include a User-Agent header that identifies 
+your company and provides a contact email. Failure to do so will result in a 403 Forbidden error.
+In this script, locate the `SEC_HEADERS` constant and update the "User-Agent" field with 
+your information (e.g., "MyCompany Name admin@example.com").
 
 EXAMPLE PROMPTS FOR AI:
 - "Get Apple's latest 10-K filing"
@@ -97,8 +103,9 @@ SEC_EDGAR_BASE = "https://www.sec.gov/Archives/edgar/data"
 
 # User agent required by SEC (must include company name and email)
 # SEC blocks requests without proper User-Agent per their policy
+# FORMAT: "Company Name email@address.com"
 SEC_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0",
+    "User-Agent": "SEC-AI-Research-Agent (admin@example.com)",
     "Accept-Encoding": "gzip, deflate",
     "Accept": "*/*"
 }
@@ -106,23 +113,38 @@ SEC_HEADERS = {
 # SEC Form Types
 SEC_FORM_TYPES = {
     "10-K": "Annual Report",
+    "20-F": "Annual Report (Foreign Issuer)",
     "10-Q": "Quarterly Report", 
     "8-K": "Current Report",
+    "6-K": "Current Report (Foreign Issuer)",
     "DEF 14A": "Proxy Statement",
     "S-1": "Registration Statement",
     "S-3": "Registration Statement",
     "S-4": "Registration Statement",
     "10-K/A": "Annual Report Amendment",
+    "20-F/A": "Annual Report Amendment (Foreign Issuer)",
     "10-Q/A": "Quarterly Report Amendment",
     "8-K/A": "Current Report Amendment",
+    "6-K/A": "Current Report Amendment (Foreign Issuer)",
     "3": "Initial Statement of Beneficial Ownership",
+    "3/A": "Initial Statement of Beneficial Ownership Amendment",
     "4": "Statement of Changes in Beneficial Ownership",
+    "4/A": "Statement of Changes in Beneficial Ownership Amendment",
     "5": "Annual Statement of Changes in Beneficial Ownership",
+    "5/A": "Annual Statement of Changes in Beneficial Ownership Amendment",
     "13D": "Schedule 13D",
+    "13D/A": "Schedule 13D Amendment",
     "13G": "Schedule 13G",
-    "13F-HR": "Institutional Investment Manager Holdings Report",
+    "13G/A": "Schedule 13G Amendment",
     "SC 13D": "Schedule 13D",
+    "SC 13D/A": "Schedule 13D Amendment",
     "SC 13G": "Schedule 13G",
+    "SC 13G/A": "Schedule 13G Amendment",
+    "SCHEDULE 13D": "Schedule 13D",
+    "SCHEDULE 13D/A": "Schedule 13D Amendment",
+    "SCHEDULE 13G": "Schedule 13G",
+    "SCHEDULE 13G/A": "Schedule 13G Amendment",
+    "13F-HR": "Institutional Investment Manager Holdings Report",
     "N-PORT": "Monthly Portfolio Investments Report",
     "N-Q": "Quarterly Schedule of Portfolio Holdings",
     "ADV": "Investment Adviser Registration",
@@ -131,9 +153,9 @@ SEC_FORM_TYPES = {
 
 # Filing frequency mappings
 FILING_FREQUENCIES = {
-    "annual": ["10-K", "DEF 14A"],
+    "annual": ["10-K", "20-F", "DEF 14A"],
     "quarterly": ["10-Q"],
-    "current": ["8-K"],
+    "current": ["8-K", "6-K"],
     "insider": ["3", "4", "5"],
     "ownership": ["13D", "13G", "SC 13D", "SC 13G"],
     "institutional": ["13F-HR"],
@@ -170,7 +192,7 @@ COMMON_CIKS = {
     "MS": "0000895421",
     "C": "0000831001",
     "AXP": "0000004962",
-    "BLK": "0001364742",
+    "BLK": "0002012383",
     "SCHW": "0000316709",
 
     # HEALTH CARE
@@ -183,38 +205,37 @@ COMMON_CIKS = {
     "AMGN": "0000318154",
     "GILD": "0000882095",
     "BIIB": "0000875045",
-    "TMO": "0001009373",
+    "TMO": "0000097745",
     "ABT": "0000001800",
-    "CI": "0000701221",
-    "AEP": "0000003670",
+    "CI": "0001739940",
+    "AEP": "0000004904",
 
     # CONSUMER & RETAIL
     "WMT": "0000104169",
     "PG": "0000080424",
     "KO": "0000021344",
-    "PEP": "0000884996",
+    "PEP": "0000077476",
     "MCD": "0000063908",
     "LOW": "0000060667",
     "HD": "0000354950",
-    "DIS": "0001001039",
+    "DIS": "0001744489",
     "NKE": "0000320187",
-    "ADIDAS": "0001345518",
-    "CVS": "0001116132",
-    "WBA": "0000012954",
+    "CVS": "0000064803",
+    "WBA": "0001618921",
 
     # INDUSTRIALS & ENERGY
     "XOM": "0000034088",
     "CVX": "0000093410",
     "COP": "0001163165",
-    "MPC": "0000029099",
-    "VLO": "0000050104",
+    "MPC": "0001510295",
+    "VLO": "0001035002",
     "PSX": "0001534701",
     "MMM": "0000066740",
     "BA": "0000012927",
     "GE": "0000040545",
-    "LMT": "0000060086",
-    "RTX": "0001282649",
-    "NOC": "0000070858",
+    "LMT": "0000936468",
+    "RTX": "0000101829",
+    "NOC": "0001133421",
     "CAT": "0000018230",
 
     # FINANCIALS & PAYMENT
@@ -222,58 +243,68 @@ COMMON_CIKS = {
     "MA": "0001141391",
     "PYPL": "0001633917",
     "SQ": "0001512673",
-    "COIN": "0001804992",
-    "AMP": "0000067689",
+    "COIN": "0001679788",
+    "AMP": "0000820027",
 
     # SEMICONDUCTORS
     "AMD": "0000002488",
     "INTC": "0000050863",
-    "QCOM": "0000804707",
-    "AVGO": "0001410291",
+    "QCOM": "0000804328",
+    "AVGO": "0001730168",
     "MU": "0000723125",
-    "LRCX": "0000707769",
-    "ASML": "0001201488",
-    "MRVL": "0001141046",
+    "LRCX": "0000707549",
+    "ASML": "0000937966",
+    "MRVL": "0001835632",
 
     # SOFTWARE & SERVICES
     "ADBE": "0000796343",
     "CRM": "0001108524",
     "NFLX": "0001065280",
-    "ORCL": "0001585681",
+    "ORCL": "0001341439",
     "IBM": "0000051143",
     "INTU": "0000896878",
-    "SPLK": "0001414850",
-    "NOW": "0001596440",
-    "DDOG": "0001772409",
+    "NOW": "0001373715",
+    "DDOG": "0001561550",
     "SNOW": "0001640147",
-    "CRWD": "0001674925",
-    "OKTA": "0001627475",
+    "CRWD": "0001535527",
+    "OKTA": "0001660134",
 
     # COMMUNICATIONS
     "VZ": "0000732712",
     "T": "0000732717",
     "CMCSA": "0001166691",
     "CHTR": "0001091667",
-    "TMUS": "0001632822",
+    "TMUS": "0001283699",
 
     # UTILITIES
-    "NEE": "0000753165",
-    "DUK": "0000063951",
+    "NEE": "0000753308",
+    "DUK": "0001326160",
     "SO": "0000092122",
-    "EXC": "0000018171",
-    "RUN": "0001518911",
+    "EXC": "0001109357",
+    "RUN": "0001469367",
 
     # RETAIL & GAMING
     "GME": "0001326380",  # GameStop - The key fix!
     "AMC": "0001411579",
-    "BBBY": "0000886494",
+    "BBBY": "0001130713",
 
     # OTHER MAJOR
-    "TSM": "0001046181",
+    "TSM": "0001046179",
+    "PLTR": "0001321655",
+    "NVO": "0000353278",
+    "AZN": "0000901832",
+    "NVS": "0001114448",
+    "HSBC": "0001089113",
+    "SAP": "0001000184",
+    "BABA": "0001577552",
+    "SONY": "0000313838",
+    "PDD": "0001737806",
+    "ARM": "0001973239",
+    "UBER": "0001543151",
     "DE": "0000315189",
-    "SCCO": "0000025996",
+    "SCCO": "0001001838",
     "FCX": "0000831259",
-    "RIO": "0001022726",
+    "RIO": "0000863064",
 
     # ETFs & FUNDS (where CIK exists)
     "SPY": "0001555280",
@@ -312,10 +343,19 @@ class TickerToCIKValidator(BaseModel):
 
 class FormTypeValidator(BaseModel):
     """Validate SEC form type"""
-    form_type: str = Field(...)
+    form_type: Union[str, List[str]] = Field(...)
 
     @validator('form_type')
     def validate_form_type(cls, v):
+        if isinstance(v, list):
+            validated_list = []
+            for item in v:
+                form_upper = item.upper().strip()
+                if form_upper not in SEC_FORM_TYPES:
+                    logger.warning(f"Unsupported form type in list: {item}. Skipping validation for this item.")
+                validated_list.append(form_upper)
+            return validated_list
+        
         form_upper = v.upper().strip()
         if form_upper not in SEC_FORM_TYPES:
             raise ValueError(f"Unsupported form type: {v}. Supported types: {list(SEC_FORM_TYPES.keys())}")
@@ -442,7 +482,7 @@ def ticker_to_cik(ticker: str) -> Optional[str]:
     try:
         logger.debug(f"  Fetching SEC company_tickers.json...")
         response = requests.get(
-            f"{SEC_API_BASE}/company_tickers.json",
+            f"{SEC_BASE_URL}/files/company_tickers.json",
             headers=SEC_HEADERS,
             timeout=10
         )
@@ -528,7 +568,7 @@ class Tools:
     async def get_company_filings(
         self,
         ticker: str,
-        form_type: Optional[str] = None,
+        form_type: Optional[Union[str, List[str]]] = None,
         limit: int = 10,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
@@ -538,7 +578,9 @@ class Tools:
 
         Args:
             ticker: Stock ticker symbol (e.g., 'AAPL', 'TSLA')
-            form_type: SEC form type (e.g., '10-K', '10-Q', '8-K'). If None, returns all forms
+            form_type: SEC form type (e.g., '10-K', '10-Q', '8-K'). 
+                       Can be a single string or a list of strings.
+                       If None, returns all forms.
             limit: Maximum number of filings to return (default: 10)
             start_date: Start date for filing search (YYYY-MM-DD format)
             end_date: End date for filing search (YYYY-MM-DD format)
@@ -605,8 +647,12 @@ class Tools:
                 primary_doc = primary_documents[i] if i < len(primary_documents) else ""
                 
                 # Filter by form type if specified
-                if validated_form and form != validated_form:
-                    continue
+                if validated_form:
+                    if isinstance(validated_form, list):
+                        if form not in validated_form:
+                            continue
+                    elif form != validated_form:
+                        continue
                     
                 # Filter by date range if specified
                 if validated_start and filing_date < validated_start:
@@ -966,9 +1012,12 @@ class Tools:
         Returns:
             Dictionary containing beneficial ownership information
         """
-        # Get both 13D and 13G filings
-        results_13d = await self.get_company_filings(ticker, form_type="13D", limit=limit//2)
-        results_13g = await self.get_company_filings(ticker, form_type="13G", limit=limit//2)
+        # Get both 13D and 13G filings (including variants and amendments)
+        forms_13d = ["13D", "13D/A", "SC 13D", "SC 13D/A", "SCHEDULE 13D", "SCHEDULE 13D/A"]
+        forms_13g = ["13G", "13G/A", "SC 13G", "SC 13G/A", "SCHEDULE 13G", "SCHEDULE 13G/A"]
+        
+        results_13d = await self.get_company_filings(ticker, form_type=forms_13d, limit=limit)
+        results_13g = await self.get_company_filings(ticker, form_type=forms_13g, limit=limit)
         
         combined_filings = []
         
@@ -1165,7 +1214,7 @@ class Tools:
         """
         try:
             # Use SEC's company tickers endpoint to find matching companies
-            response = self.session.get(f"{SEC_API_BASE}/company_tickers.json", timeout=30)
+            response = self.session.get(f"{SEC_BASE_URL}/files/company_tickers.json", timeout=30)
             response.raise_for_status()
             
             tickers_data = response.json()
@@ -1262,7 +1311,7 @@ class Tools:
         try:
             # Test basic connectivity
             start_time = time.time()
-            response = self.session.get(f"{SEC_API_BASE}/company_tickers.json", timeout=10)
+            response = self.session.get(f"{SEC_BASE_URL}/files/company_tickers.json", timeout=10)
             response_time = time.time() - start_time
             
             if response.status_code == 200:
@@ -1307,9 +1356,18 @@ class Tools:
             ("Latest 10-K", lambda: self.get_latest_10k("AAPL")),
             ("Latest 10-Q", lambda: self.get_latest_10q("AAPL")),
             ("Recent 8-K", lambda: self.get_recent_8k_filings("AAPL", limit=2)),
+            ("Analyze 8-K", lambda: self.analyze_8k_filing("AAPL")),
+            ("Proxy Statements", lambda: self.get_proxy_statements("AAPL", limit=1)),
             ("Company Facts", lambda: self.get_company_facts("AAPL")),
+            ("Company Concept", lambda: self.get_company_concept("AAPL", "Assets")),
             ("Insider Transactions", lambda: self.get_insider_transactions("AAPL", limit=3)),
-            ("Search Filings", lambda: self.search_filings("Apple", limit=3))
+            ("Beneficial Ownership", lambda: self.get_beneficial_ownership("AAPL", limit=1)),
+            ("Available Metrics", lambda: self.get_available_metrics("AAPL")),
+            ("Filing Content (Smart Mode)", lambda: self.get_filing_content("AAPL")),
+            ("Recent IPOs", lambda: self.get_recent_ipos(limit=5)),
+            ("Search Filings", lambda: self.search_filings("Apple", limit=3)),
+            ("Dynamic Ticker", lambda: self.get_company_filings("HOOD", limit=1)),
+            ("Available Functions", lambda: {"functions": self.get_available_functions()})
         ]
         
         passed = 0
@@ -1318,7 +1376,19 @@ class Tools:
         for test_name, test_func in test_cases:
             try:
                 start_time = time.time()
-                result = await test_func()
+                # Handle both sync and async functions
+                if asyncio.iscoroutinefunction(test_func) or (hasattr(test_func, 'func') and asyncio.iscoroutinefunction(test_func.func)):
+                    result = await test_func()
+                elif callable(test_func):
+                    # Check if it's a lambda or function that returns a coroutine
+                    res = test_func()
+                    if asyncio.iscoroutine(res):
+                        result = await res
+                    else:
+                        result = res
+                else:
+                    result = test_func
+                
                 execution_time = time.time() - start_time
                 
                 if "error" not in result:
@@ -1383,7 +1453,7 @@ class Tools:
             logger.info(f"Discovering metrics for {ticker}...")
 
             # Get CIK (ticker_to_cik is a regular function, not async - returns CIK string or None)
-            cik = self.ticker_to_cik(ticker)
+            cik = ticker_to_cik(ticker)
             if not cik:
                 return {"error": f"Failed to find CIK for ticker {ticker}"}
 
