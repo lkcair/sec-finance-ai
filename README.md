@@ -8,7 +8,7 @@
 
 **Github**: [Github](https://github.com/lkcair/)
 
-**Version**: 1.2.0
+**Version**: 1.3.0
 
 **License**: MIT
 
@@ -64,6 +64,8 @@ SEC_HEADERS = {
 ✅ **Monolithic Codebase:** Single-file script allowing easy integration
 
 ✅ **40+ SEC Filing Tools** - Full access to EDGAR database
+
+✅ **Full Text Retrieval** - Smart retrieval of full filing content with automatic HTML cleaning and size limits
 
 ✅ **Foreign Issuer Support** - Full support for **20-F** and **6-K** filings
 

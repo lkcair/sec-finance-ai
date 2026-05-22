@@ -524,7 +524,7 @@ def format_filing_date(date_str: str) -> str:
         return date_str
 
 
-def extract_text_from_html(html_content: str, max_length: int = 5000) -> str:
+def extract_text_from_html(html_content: str, max_length: int = 1000000) -> str:
     """Extract clean text from HTML content"""
     try:
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -548,7 +548,7 @@ def extract_text_from_html(html_content: str, max_length: int = 5000) -> str:
 class Tools:
     """
     SEC-AI Tools - Comprehensive SEC Filing Access Suite
-    
+
     This class provides 40+ tools for accessing SEC filings, company data,
     insider trading information, and more through the SEC's EDGAR database.
     """
@@ -563,6 +563,55 @@ class Tools:
     # CORE SEC FILING TOOLS
     # ============================================================
 
+    @safe_sec_call
+    @rate_limit()
+    async def download_filing_text(self, filing_url: str, max_length: int = 1000000) -> Dict[str, Any]:
+        """
+        Download and extract clean text from a SEC filing URL.
+
+        Args:
+            filing_url: Full URL to the SEC filing (HTML or TXT)
+            max_length: Maximum number of characters to return (default: 1,000,000)
+
+        Returns:
+            Dictionary containing extracted text and metadata
+        """
+        logger.info(f"=== download_filing_text({filing_url}) ===")
+
+        try:
+            # Check size first to avoid downloading massive files
+            head_response = self.session.head(filing_url, timeout=10, allow_redirects=True)
+            compressed_size = int(head_response.headers.get('content-length', 0))
+
+            # If compressed size is > 5MB, it's definitely too big for AI context
+            if compressed_size > 5 * 1024 * 1024:
+                return {
+                    "error": "Filing is too large for automatic processing",
+                    "compressed_size_mb": round(compressed_size / (1024 * 1024), 2),
+                    "filing_url": filing_url,
+                    "note": "The filing exceeds 5MB (compressed), which is too large for AI context. Please download and analyze it manually."
+                }
+
+            logger.info(f"Downloading filing: {filing_url}")
+            response = self.session.get(filing_url, timeout=60)
+            response.raise_for_status()
+
+            # Extract text
+            content = response.text
+            clean_text = extract_text_from_html(content, max_length=max_length)
+
+            logger.info(f"✓ Extracted {len(clean_text)} characters")
+
+            return {
+                "filing_url": filing_url,
+                "content_length": len(clean_text),
+                "content": clean_text,
+                "note": f"Successfully extracted {len(clean_text)} characters from the filing."
+            }
+
+        except Exception as e:
+            logger.error(f"Error downloading filing: {e}")
+            return {"error": str(e), "filing_url": filing_url}
     @safe_sec_call
     @rate_limit()
     async def get_company_filings(
@@ -662,7 +711,8 @@ class Tools:
                 
                 # Build filing URL
                 accession_clean = accession.replace('-', '')
-                filing_url = f"{SEC_EDGAR_BASE}/{cik}/{accession_clean}/{primary_doc}"
+                cik_no_zeros = cik.lstrip('0')
+                filing_url = f"{SEC_EDGAR_BASE}/{cik_no_zeros}/{accession_clean}/{primary_doc}"
                 
                 filing_info = {
                     "form": form,
@@ -1364,6 +1414,8 @@ class Tools:
             ("Beneficial Ownership", lambda: self.get_beneficial_ownership("AAPL", limit=1)),
             ("Available Metrics", lambda: self.get_available_metrics("AAPL")),
             ("Filing Content (Smart Mode)", lambda: self.get_filing_content("AAPL")),
+            ("Full Content Download", lambda: self.get_filing_content("AAPL", get_full_content=True)),
+            ("Download Filing Text Tool", lambda: self.download_filing_text("https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/aapl-20230930.htm", max_length=1000)),
             ("Recent IPOs", lambda: self.get_recent_ipos(limit=5)),
             ("Search Filings", lambda: self.search_filings("Apple", limit=3)),
             ("Dynamic Ticker", lambda: self.get_company_filings("HOOD", limit=1)),
@@ -1707,11 +1759,11 @@ class Tools:
                 latest_filing = filings_result["filings"][0]
                 filing_url = latest_filing.get("filing_url")
 
-                logger.info(f"Checking filing size...")
+                logger.info(f"Checking filing size for URL: {filing_url}")
 
                 try:
                     # Check size WITHOUT downloading
-                    head_response = self.session.head(filing_url, timeout=10)
+                    head_response = self.session.head(filing_url, timeout=10, allow_redirects=True)
                     file_size = int(head_response.headers.get('content-length', 0))
                     MAX_FILE_SIZE = 1024 * 1024  # 1MB limit
 
@@ -1730,7 +1782,8 @@ class Tools:
                         content_response = self.session.get(filing_url, timeout=30)
                         content_response.raise_for_status()
 
-                        content = content_response.text
+                        # Extract clean text from HTML for AI context efficiency
+                        content = extract_text_from_html(content_response.text)
                         response_data["full_content"] = content
                         response_data["content_size_kb"] = round(len(content) / 1024, 2)
                         logger.info(f"✓ Read {response_data['content_size_kb']}KB")
@@ -1839,6 +1892,14 @@ class Tools:
                 }
             },
             {
+                "name": "download_filing_text",
+                "description": "Download and extract clean text from any SEC filing URL. Use this when you have a filing_url and need to analyze its full text content.",
+                "parameters": {
+                    "filing_url": "Full URL to the SEC filing (required)",
+                    "max_length": "Maximum characters to return (optional, default 1,000,000)"
+                }
+            },
+            {
                 "name": "search_filings",
                 "description": "Search SEC filings by company name or criteria",
                 "parameters": {
@@ -1856,10 +1917,12 @@ class Tools:
             },
             {
                 "name": "get_filing_content",
-                "description": "Download full text content of a SEC filing using sec-edgar library",
+                "description": "Get SEC financial data with optional full text content. By default returns essential financial metrics and links. Use get_full_content=True to attempt downloading the full filing text (limit 1MB).",
                 "parameters": {
                     "ticker": "Stock ticker symbol (required)",
-                    "filing_type": "Type of filing - 10-Q, 10-K, 8-K (default: 10-Q)"
+                    "filing_type": "Type of filing - 10-Q, 10-K, 8-K (default: 10-Q)",
+                    "get_full_content": "Boolean: If True, attempts to download and return full text content (default: False)",
+                    "specific_metrics": "Optional list of specific XBRL metric names to fetch"
                 }
             },
             {
@@ -1927,6 +1990,10 @@ async def search_filings(query: str, form_type: str = None, start_date: str = No
 async def get_sec_api_status() -> dict:
     """Check SEC API status and connectivity"""
     return await tools.get_sec_api_status()
+
+async def download_filing_text(filing_url: str, max_length: int = 1000000) -> dict:
+    """Download and extract clean text from any SEC filing URL"""
+    return await tools.download_filing_text(filing_url, max_length)
 
 async def get_filing_content(ticker: str, filing_type: str = "10-Q", get_full_content: bool = False, specific_metrics: list = None) -> dict:
     """

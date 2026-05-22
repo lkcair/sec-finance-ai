@@ -74,8 +74,9 @@ Replace METHOD(ARGS) with any call below.
 | Beneficial Ownership | `get_beneficial_ownership(ticker='GME')` |
 | Insider Transactions | `get_insider_transactions(ticker='TSLA')` |
 | Company Facts | `get_company_facts(ticker='AAPL')` |
-| Filing Content | `get_filing_content(ticker='AAPL')` |
+| Filing Content | `get_filing_content(ticker='AAPL', get_full_content=True)` |
 | Search Filings | `search_filings(query='Apple')` |
+| Download Text | `download_filing_text(filing_url='...')` |
 
 ## Routing
 
@@ -86,6 +87,9 @@ Replace METHOD(ARGS) with any call below.
 - "Insider trading" → `get_insider_transactions`
 - "Financials/Facts" → `get_company_facts`
 - "Search SEC" → `search_filings`
+- "Download filing" → `download_filing_text`
+- "Read full 10-K" → `get_filing_content(ticker='...', filing_type='10-K', get_full_content=True)`
+- "Get links only" → `get_company_filings`
 ````
 
 ---
@@ -97,7 +101,7 @@ By Categories:
 - **Filing Access**: `get_company_filings`, `get_latest_10k`, `get_latest_10q`, `get_recent_8k_filings`, `analyze_8k_filing`, `get_proxy_statements`
 - **Ownership/Insider**: `get_insider_transactions`, `get_beneficial_ownership`
 - **Financial Facts**: `get_company_facts`, `get_company_concept`, `get_available_metrics`
-- **Content Retrieval**: `get_filing_content`
+- **Content Retrieval**: `get_filing_content`, `download_filing_text`
 - **Utility**: `search_filings`, `get_recent_ipos`, `get_sec_api_status`, `run_self_test`, `get_available_functions`
 
 ## Notes
