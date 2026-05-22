@@ -153,5 +153,5 @@ This will test all 17+ functions and report results with **100% pass rate**.
 
 *SEC-AI is not affiliated with the U.S. Securities and Exchange Commission. All data is sourced from public SEC databases with proper attribution.*
 
-*Version: 1.2.0*
+*Version: 1.3.0*
 *Status: Production Ready ✅*
