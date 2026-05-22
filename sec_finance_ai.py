@@ -4,7 +4,7 @@ description: Complete SEC Filing Data Suite - 40+ tools for 10-K, 10-Q, 8-K, pro
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 1.2.0
+version: 1.3.0
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
