@@ -2,7 +2,7 @@
 
 ### AI-Powered SEC Filing Integration for Your AI Assistant
 
-**Natural Language SEC Integration** - Access 40+ SEC filing tools directly from OpenWebUI, Claude, ChatGPT, or any AI assistant. Get 10-K, 10-Q, 8-K filings, 13D/13G beneficial ownership, insider trading data, company facts (XBRL), and institutional holdings via simple natural language queries.
+**Natural Language SEC Integration** - Access 19+ SEC filing tools directly from OpenWebUI, Claude, ChatGPT, or any AI assistant. Get 10-K, 10-Q, 8-K filings, 13D/13G beneficial ownership, insider trading data, company facts (XBRL), and institutional holdings via simple natural language queries.
 
 **Author**: lucas0
 
@@ -21,10 +21,11 @@
 **OpenClaw Page**: [https://clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec)
 
 ---
-# Star the Github or the Skill if you like it.
+# Star the [Github](https://github.com/lkcair/sec-finance-ai) or the Skill if you like it.
 **Repository**: https://github.com/lkcair/sec-finance-ai
 
-Also, try [yfinance-ai](https://github.com/lkcair/yfinance-ai) for stocks and crypto data.
+# Also, try [yfinance-ai](https://github.com/lkcair/yfinance-ai) for stocks and crypto data.
+
 
 # 🚀 Quick Start
 ## 🦞 (Main) Installation with OpenClaw
@@ -139,7 +140,7 @@ AI can self-test by asking:
 "Run self-test on SEC tools"
 ```
 
-This will test all 17+ functions and report results with **100% pass rate**.
+This will test all 19+ functions and report results with **100% pass rate**.
 
 ---
 
@@ -153,5 +154,5 @@ This will test all 17+ functions and report results with **100% pass rate**.
 
 *SEC-AI is not affiliated with the U.S. Securities and Exchange Commission. All data is sourced from public SEC databases with proper attribution.*
 
-*Version: 1.3.0*
+*Version: 1.3.1*
 *Status: Production Ready ✅*
