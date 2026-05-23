@@ -25,7 +25,7 @@ INTEGRATION WITH OTHER AI TOOLS:
 - API: Deploy as FastAPI/Flask endpoint
 
 FEATURES:
-- 40+ SEC filing access tools - the most comprehensive SEC integration
+- 19+ SEC filing access tools - the most comprehensive SEC integration
 - Multi-filing support: 10-K, 10-Q, 8-K, DEF 14A, S-1, and more
 - Real-time SEC filing notifications and searches
 - Company facts and financial data from SEC XBRL
