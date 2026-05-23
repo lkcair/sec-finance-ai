@@ -4,7 +4,7 @@ description: Complete SEC Filing Data Suite - 40+ tools for 10-K, 10-Q, 8-K, pro
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 1.3.0
+version: 1.3.1
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
@@ -83,7 +83,7 @@ import time
 import asyncio
 import json
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin, quote, urlparse
 import xml.etree.ElementTree as ET
 
 # Direct SEC EDGAR API approach - no external library needed
@@ -577,6 +577,20 @@ class Tools:
             Dictionary containing extracted text and metadata
         """
         logger.info(f"=== download_filing_text({filing_url}) ===")
+
+        # Security: Restrict to official SEC domains to prevent SSRF
+        try:
+            parsed_url = urlparse(filing_url)
+            domain = parsed_url.netloc.lower()
+            if not (domain == "sec.gov" or domain.endswith(".sec.gov")):
+                logger.error(f"Security blocked: Attempted access to non-SEC domain: {domain}")
+                return {
+                    "error": "Security violation: Only official SEC EDGAR domains (sec.gov) are allowed.",
+                    "filing_url": filing_url
+                }
+        except Exception as e:
+            logger.error(f"Error validating URL: {e}")
+            return {"error": "Invalid URL provided", "filing_url": filing_url}
 
         try:
             # Check size first to avoid downloading massive files
