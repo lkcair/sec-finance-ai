@@ -1,10 +1,10 @@
 """
 title: sec-finance-ai - AI-Powered SEC Filing Integration
-description: Complete SEC Filing Data Suite - 40+ tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, Claude, ChatGPT, and any AI assistant.
+description: Complete SEC Filing Data Suite - 23 tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, Claude, ChatGPT, and any AI assistant.
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 1.3.1
+version: 1.4.1
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
@@ -25,7 +25,7 @@ INTEGRATION WITH OTHER AI TOOLS:
 - API: Deploy as FastAPI/Flask endpoint
 
 FEATURES:
-- 19+ SEC filing access tools - the most comprehensive SEC integration
+- 23 SEC tools: filings, full-text search, filing text with paging/search/link-only, 13F, XBRL frames
 - Multi-filing support: 10-K, 10-Q, 8-K, DEF 14A, S-1, and more
 - Real-time SEC filing notifications and searches
 - Company facts and financial data from SEC XBRL
@@ -71,18 +71,23 @@ This will test all 40+ functions and report results.
 """
 
 from typing import Callable, Any, Optional, List, Dict, Union, Tuple
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime, timedelta, date
 from dateutil import parser as dateutil_parser
 from functools import wraps
 import pandas as pd
+import os
 import requests
 import logging
 import re
 import time
+import inspect
 import asyncio
 import json
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+import warnings
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 from urllib.parse import urljoin, quote, urlparse
 import xml.etree.ElementTree as ET
 
@@ -99,13 +104,14 @@ logger = logging.getLogger(__name__)
 # SEC API Configuration
 SEC_BASE_URL = "https://www.sec.gov"
 SEC_API_BASE = "https://data.sec.gov"
+SEC_EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
 SEC_EDGAR_BASE = "https://www.sec.gov/Archives/edgar/data"
 
 # User agent required by SEC (must include company name and email)
 # SEC blocks requests without proper User-Agent per their policy
 # FORMAT: "Company Name email@address.com"
 SEC_HEADERS = {
-    "User-Agent": "SEC-AI-Research-Agent (admin@example.com)",
+    "User-Agent": os.environ.get("SEC_USER_AGENT") or "SEC-AI-Research-Agent (admin@example.com)",
     "Accept-Encoding": "gzip, deflate",
     "Accept": "*/*"
 }
@@ -113,6 +119,7 @@ SEC_HEADERS = {
 # Network safety limits (decoded bytes, so gzip bombs are capped too)
 MAX_RESPONSE_BYTES = 50 * 1024 * 1024
 MAX_FILING_BYTES = 25 * 1024 * 1024
+TEXT_PAGE_CHARS = 50000
 MAX_REDIRECTS = 5
 
 
@@ -224,7 +231,60 @@ SEC_FORM_TYPES = {
     "SCHEDULE 13D/A": "Schedule 13D Amendment",
     "SCHEDULE 13G": "Schedule 13G",
     "SCHEDULE 13G/A": "Schedule 13G Amendment",
+    "10-KT": "Annual Report (Transition Period)",
+    "10-QT": "Quarterly Report (Transition Period)",
+    "40-F": "Annual Report (Canadian Issuer)",
+    "40-F/A": "Annual Report Amendment (Canadian Issuer)",
+    "ARS": "Annual Report to Shareholders",
+    "11-K": "Employee Benefit Plan Annual Report",
+    "NT 10-K": "Notification of Late 10-K Filing",
+    "NT 10-Q": "Notification of Late 10-Q Filing",
+    "NT 20-F": "Notification of Late 20-F Filing",
+    "DEF 14A/A": "Proxy Statement Amendment",
+    "DEFA14A": "Additional Proxy Soliciting Materials",
+    "DEFM14A": "Merger Proxy Statement",
+    "PRE 14A": "Preliminary Proxy Statement",
+    "DEF 14C": "Information Statement",
+    "PRE 14C": "Preliminary Information Statement",
+    "S-1/A": "Registration Statement Amendment",
+    "S-3/A": "Registration Statement Amendment",
+    "S-4/A": "Registration Statement Amendment",
+    "S-8": "Employee Benefit Plan Registration",
+    "S-11": "Real Estate Registration Statement",
+    "F-1": "Registration Statement (Foreign Issuer)",
+    "F-1/A": "Registration Statement Amendment (Foreign Issuer)",
+    "F-3": "Registration Statement (Foreign Issuer)",
+    "F-4": "Business Combination Registration (Foreign Issuer)",
+    "DRS": "Draft Registration Statement",
+    "424B1": "Prospectus",
+    "424B2": "Prospectus",
+    "424B3": "Prospectus",
+    "424B4": "Final Prospectus (priced offering, typical for IPOs)",
+    "424B5": "Prospectus Supplement",
+    "425": "Business Combination Communication",
+    "10-12B": "Registration of Securities (Exchange Listing)",
+    "10-12G": "Registration of Securities",
+    "8-A12B": "Registration of Securities on an Exchange",
+    "15-12G": "Termination of Registration",
+    "15-12B": "Termination of Registration",
+    "25-NSE": "Notification of Removal from Listing",
+    "SC TO-T": "Third-Party Tender Offer",
+    "SC TO-I": "Issuer Tender Offer",
+    "SC 14D9": "Tender Offer Solicitation/Recommendation",
+    "SD": "Specialized Disclosure (Conflict Minerals)",
+    "144": "Notice of Proposed Sale of Securities",
+    "D": "Notice of Exempt Offering (Form D)",
+    "D/A": "Notice of Exempt Offering Amendment",
+    "1-A": "Regulation A Offering Statement",
+    "C": "Regulation Crowdfunding Offering",
+    "N-CSR": "Fund Annual/Semi-Annual Shareholder Report",
+    "N-CEN": "Fund Annual Report",
+    "NPORT-P": "Monthly Portfolio Investments Report",
+    "485BPOS": "Fund Prospectus Post-Effective Amendment",
+    "497": "Fund Prospectus",
     "13F-HR": "Institutional Investment Manager Holdings Report",
+    "13F-HR/A": "Institutional Investment Manager Holdings Report Amendment",
+    "13F-NT": "Institutional Investment Manager Notice",
     "N-PORT": "Monthly Portfolio Investments Report",
     "N-Q": "Quarterly Schedule of Portfolio Holdings",
     "ADV": "Investment Adviser Registration",
@@ -400,7 +460,9 @@ class CIKValidator(BaseModel):
     """Validate CIK (Central Index Key) input"""
     cik: str = Field(..., min_length=1, max_length=10)
 
-    @validator('cik')
+    @field_validator('cik')
+
+    @classmethod
     def validate_cik(cls, v):
         # Remove any non-numeric characters and pad with zeros
         cik_clean = re.sub(r'[^0-9]', '', str(v))
@@ -413,9 +475,11 @@ class TickerToCIKValidator(BaseModel):
     """Validate ticker symbol and convert to CIK"""
     ticker: str = Field(..., min_length=1, max_length=10)
 
-    @validator('ticker')
+    @field_validator('ticker')
+
+    @classmethod
     def validate_ticker(cls, v):
-        ticker_upper = v.upper().strip()
+        ticker_upper = str(v).upper().strip()
         if not re.match(r'^[A-Z0-9.\-]+$', ticker_upper):
             raise ValueError(f"Invalid ticker symbol format: {v}")
         return ticker_upper
@@ -425,21 +489,33 @@ class FormTypeValidator(BaseModel):
     """Validate SEC form type"""
     form_type: Union[str, List[str]] = Field(...)
 
-    @validator('form_type')
+    @field_validator('form_type')
+
+    @classmethod
     def validate_form_type(cls, v):
-        if isinstance(v, list):
-            validated_list = []
-            for item in v:
-                form_upper = item.upper().strip()
-                if form_upper not in SEC_FORM_TYPES:
-                    logger.warning(f"Unsupported form type in list: {item}. Skipping validation for this item.")
-                validated_list.append(form_upper)
-            return validated_list
-        
-        form_upper = v.upper().strip()
-        if form_upper not in SEC_FORM_TYPES:
-            raise ValueError(f"Unsupported form type: {v}. Supported types: {list(SEC_FORM_TYPES.keys())}")
-        return form_upper
+        items = v if isinstance(v, list) else [v]
+        validated_list = []
+        for item in items:
+            form_upper = re.sub(r'\s+', ' ', str(item).upper().strip())
+            if not FORM_PATTERN.match(form_upper):
+                raise ValueError(f"Invalid form type: {item}. Examples: {', '.join(list(SEC_FORM_TYPES)[:12])}")
+            if form_upper not in SEC_FORM_TYPES:
+                logger.info(f"Form type {form_upper} is not in the known list; matching it exactly")
+            validated_list.append(form_upper)
+        return validated_list if isinstance(v, list) else validated_list[0]
+
+
+FORM_PATTERN = re.compile(r'^[A-Z0-9][A-Z0-9 ./\-]{0,24}$')
+
+
+def form_list(form_type: Optional[Union[str, List[str]]]) -> List[str]:
+    """Normalize a form type argument (string, comma-separated string or list) to a list"""
+    if not form_type:
+        return []
+    if isinstance(form_type, str):
+        form_type = [f for f in form_type.split(",") if f.strip()]
+    validated = FormTypeValidator(form_type=list(form_type)).form_type
+    return validated
 
 
 class DateRangeValidator(BaseModel):
@@ -447,7 +523,9 @@ class DateRangeValidator(BaseModel):
     start_date: Optional[str] = Field(default=None)
     end_date: Optional[str] = Field(default=None)
 
-    @validator('start_date', 'end_date')
+    @field_validator('start_date', 'end_date')
+
+    @classmethod
     def validate_dates(cls, v):
         if v is None:
             return v
@@ -541,8 +619,12 @@ def ticker_to_cik(ticker: str) -> Optional[str]:
     Returns:
         CIK as 10-digit zero-padded string, or None if not found
     """
-    ticker_upper = ticker.upper().strip()
+    ticker_upper = str(ticker).upper().strip().replace(".", "-").replace("/", "-")
     logger.debug(f"Attempting to resolve CIK for ticker: {ticker_upper}")
+
+    # A numeric value is already a CIK (funds, 13F managers, private issuers)
+    if ticker_upper.isdigit() and len(ticker_upper) <= 10:
+        return ticker_upper.zfill(10)
 
     # Tier 1: Check cache first
     if ticker_upper in _cik_cache:
@@ -604,11 +686,16 @@ def format_filing_date(date_str: str) -> str:
 def extract_text_from_html(html_content: str, max_length: int = 1000000) -> str:
     """Extract clean text from HTML content"""
     try:
-        soup = BeautifulSoup(html_content, 'html.parser')
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
+        try:
+            soup = BeautifulSoup(html_content, 'lxml')
+        except Exception:
+            soup = BeautifulSoup(html_content, 'html.parser')
+        # Remove script/style and hidden inline-XBRL blocks (ix:header, display:none)
+        for script in soup(["script", "style", "ix:header"]):
             script.decompose()
-        text = soup.get_text()
+        for hidden in soup.select('[style*="display:none"], [style*="display: none"]'):
+            hidden.decompose()
+        text = soup.get_text(separator=" ")
         # Clean up whitespace
         lines = (line.strip() for line in text.splitlines())
         chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
@@ -641,16 +728,31 @@ class Tools:
 
     @safe_sec_call
     @rate_limit()
-    async def download_filing_text(self, filing_url: str, max_length: int = 1000000) -> Dict[str, Any]:
+    async def download_filing_text(
+        self,
+        filing_url: str,
+        max_length: int = TEXT_PAGE_CHARS,
+        offset: int = 0,
+        search: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        Download and extract clean text from a SEC filing URL.
+        Read or search the text of one SEC filing document. Three modes, chosen automatically:
+
+        - mode 'text': returns `content` in pages of max_length characters. If has_more is
+          true, call again with offset=next_offset to keep reading.
+        - mode 'search': when `search` is given, returns snippets around each match with its
+          position (use offset=position to read that part).
+        - mode 'link_only': when the document is larger than the size limit, returns only the
+          link and size so the user can open it. The exact size is checked BEFORE downloading.
 
         Args:
-            filing_url: Full URL to the SEC filing (HTML or TXT)
-            max_length: Maximum number of characters to return (default: 1,000,000)
+            filing_url: Filing document URL (https://www.sec.gov/Archives/edgar/data/...)
+            max_length: Characters per page (default 50,000)
+            offset: Character position to start reading from (default 0)
+            search: Optional word or phrase to find inside the filing (case-insensitive)
 
         Returns:
-            Dictionary containing extracted text and metadata
+            Dictionary with mode, filing_url, size_mb, total_characters and content/snippets
         """
         logger.info(f"=== download_filing_text({filing_url}) ===")
 
@@ -662,36 +764,87 @@ class Tools:
                 "error": "Security violation: Only official SEC EDGAR URLs (https://*.sec.gov) are allowed.",
                 "filing_url": filing_url
             }
-
         try:
-            logger.info(f"Downloading filing: {filing_url}")
-            try:
-                response = self.session.get(filing_url, timeout=60, max_bytes=MAX_FILING_BYTES)
-            except ResponseTooLargeError as e:
-                return {
-                    "error": "Filing is too large for automatic processing",
-                    "size_mb": round(e.size / (1024 * 1024), 2),
-                    "filing_url": filing_url,
-                    "note": f"The filing exceeds {MAX_FILING_BYTES // (1024 * 1024)}MB, which is too large for AI context. Please download and analyze it manually."
-                }
-            response.raise_for_status()
-
-            # Extract text
-            content = response.text
-            clean_text = extract_text_from_html(content, max_length=max_length)
-
-            logger.info(f"✓ Extracted {len(clean_text)} characters")
-
-            return {
-                "filing_url": filing_url,
-                "content_length": len(clean_text),
-                "content": clean_text,
-                "note": f"Successfully extracted {len(clean_text)} characters from the filing."
-            }
-
+            return self._read_filing(filing_url, max_length=max_length, offset=offset, search=search)
         except Exception as e:
             logger.error(f"Error downloading filing: {e}")
             return {"error": str(e), "filing_url": filing_url}
+
+    def _link_only(self, filing_url: str, size_bytes: int, exact: bool = True) -> Dict[str, Any]:
+        """Build the link-only answer for a document over the size limit"""
+        size_mb = round(size_bytes / (1024 * 1024), 2)
+        size_text = f"{size_mb}MB" if exact else f"more than {MAX_FILING_BYTES // (1024 * 1024)}MB"
+        return {
+            "mode": "link_only",
+            "filing_url": filing_url,
+            "size_mb": size_mb if exact else None,
+            "ai_note": (
+                f"This document is {size_text}, above the {MAX_FILING_BYTES // (1024 * 1024)}MB text limit. "
+                f"Give the user this link to open it: {filing_url}. For numbers use get_filing_content "
+                f"or get_company_concept; for smaller parts use get_filing_documents to list exhibits."
+            )
+        }
+
+    def _read_filing(
+        self,
+        filing_url: str,
+        max_length: int = TEXT_PAGE_CHARS,
+        offset: int = 0,
+        search: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Size-check, download and return one page of text, search snippets, or a link"""
+        size = self._document_size(filing_url)
+        if size and size > MAX_FILING_BYTES:
+            return self._link_only(filing_url, size)
+        try:
+            response = self.session.get(filing_url, timeout=60, max_bytes=MAX_FILING_BYTES)
+        except ResponseTooLargeError as e:
+            return self._link_only(filing_url, e.size, exact=e.size == size)
+        response.raise_for_status()
+
+        text = extract_text_from_html(response.text, max_length=len(response.text) + 1)
+        total = len(text)
+        base = {
+            "filing_url": filing_url,
+            "size_mb": round((size or len(response.content)) / (1024 * 1024), 2),
+            "total_characters": total,
+        }
+
+        if search:
+            needle = str(search).lower()
+            haystack = text.lower()
+            positions, start = [], haystack.find(needle)
+            while start != -1:
+                positions.append(start)
+                start = haystack.find(needle, start + len(needle))
+            snippets = [{"position": pos, "text": text[max(0, pos - 400):pos + len(needle) + 400]}
+                        for pos in positions[:20]]
+            return {
+                **base,
+                "mode": "search",
+                "search": search,
+                "total_matches": len(positions),
+                "snippets": snippets,
+                "ai_note": "To read around a match, call download_filing_text with offset=<position minus a few thousand>."
+            }
+
+        offset = max(0, int(offset or 0))
+        max_length = max(1000, min(int(max_length or TEXT_PAGE_CHARS), 500000))
+        chunk = text[offset:offset + max_length]
+        has_more = offset + len(chunk) < total
+        return {
+            **base,
+            "mode": "text",
+            "offset": offset,
+            "content_length": len(chunk),
+            "content": chunk,
+            "has_more": has_more,
+            "next_offset": offset + len(chunk) if has_more else None,
+            "ai_note": (f"Showing characters {offset}-{offset + len(chunk)} of {total}. "
+                        + ("Call again with offset=next_offset for more, or use search='keyword' to jump to a topic."
+                           if has_more else "This is the end of the document."))
+        }
+
     @safe_sec_call
     @rate_limit()
     async def get_company_filings(
@@ -722,6 +875,8 @@ class Tools:
         ticker_validator = TickerToCIKValidator(ticker=ticker)
         validated_ticker = ticker_validator.ticker
         
+        if isinstance(form_type, str) and "," in form_type:
+            form_type = [f for f in form_type.split(",") if f.strip()]
         if form_type:
             form_validator = FormTypeValidator(form_type=form_type)
             validated_form = form_validator.form_type
@@ -762,18 +917,29 @@ class Tools:
             if not filings:
                 return {"error": "No filings found"}
 
+            # "recent" holds the latest ~1000 filings; older ones are in extra pages
+            def filing_rows():
+                pages = [filings]
+                older = data.get('filings', {}).get('files', [])
+                page_index = 0
+                while page_index < len(pages):
+                    page = pages[page_index]
+                    page_index += 1
+                    for i in range(min(len(page.get('form', [])), len(page.get('filingDate', [])), len(page.get('accessionNumber', [])))):
+                        docs = page.get('primaryDocument', [])
+                        yield page['form'][i], page['filingDate'][i], page['accessionNumber'][i], docs[i] if i < len(docs) else ""
+                    if older and (validated_form or validated_start):
+                        if validated_start and page.get('filingDate') and min(page['filingDate']) < validated_start:
+                            continue
+                        name = older.pop(0)['name']
+                        older_resp = self.session.get(f"{SEC_API_BASE}/submissions/{name}", timeout=30)
+                        older_resp.raise_for_status()
+                        pages.append(older_resp.json())
+
             # Process filings
             filing_list = []
-            forms = filings.get('form', [])
-            filing_dates = filings.get('filingDate', [])
-            accession_numbers = filings.get('accessionNumber', [])
-            primary_documents = filings.get('primaryDocument', [])
             
-            for i in range(min(len(forms), len(filing_dates), len(accession_numbers))):
-                form = forms[i]
-                filing_date = filing_dates[i]
-                accession = accession_numbers[i]
-                primary_doc = primary_documents[i] if i < len(primary_documents) else ""
+            for form, filing_date, accession, primary_doc in filing_rows():
                 
                 # Filter by form type if specified
                 if validated_form:
@@ -1131,7 +1297,7 @@ class Tools:
 
     @safe_sec_call
     @rate_limit()
-    async def get_beneficial_ownership(self, ticker: str, limit: int = 10) -> Dict[str, Any]:
+    async def get_beneficial_ownership(self, ticker: str, limit: int = 10, schedule: str = "all") -> Dict[str, Any]:
         """
         Get beneficial ownership reports (13D, 13G) for a company.
         
@@ -1146,8 +1312,9 @@ class Tools:
         forms_13d = ["13D", "13D/A", "SC 13D", "SC 13D/A", "SCHEDULE 13D", "SCHEDULE 13D/A"]
         forms_13g = ["13G", "13G/A", "SC 13G", "SC 13G/A", "SCHEDULE 13G", "SCHEDULE 13G/A"]
         
-        results_13d = await self.get_company_filings(ticker, form_type=forms_13d, limit=limit)
-        results_13g = await self.get_company_filings(ticker, form_type=forms_13g, limit=limit)
+        schedule = str(schedule).upper().replace("SC ", "").strip()
+        results_13d = await self.get_company_filings(ticker, form_type=forms_13d, limit=limit) if schedule in ("ALL", "13D") else {}
+        results_13g = await self.get_company_filings(ticker, form_type=forms_13g, limit=limit) if schedule in ("ALL", "13G") else {}
         
         combined_filings = []
         
@@ -1162,8 +1329,10 @@ class Tools:
         
         return {
             "ticker": ticker,
-            "total_filings": len(combined_filings),
-            "filings": combined_filings[:limit]
+            "schedule": schedule,
+            "total_filings": len(combined_filings[:limit]),
+            "filings": combined_filings[:limit],
+            "note": "13D = activist or control intent (>5%); 13G = passive holder (>5%). Use schedule='13D' or '13G' to filter."
         }
 
     # ============================================================
@@ -1405,27 +1574,316 @@ class Tools:
         except Exception as e:
             return {"error": f"Search failed: {str(e)}"}
 
+    # ============================================================
+    # FILING SIZE, DOCUMENTS & SEARCH TOOLS
+    # ============================================================
+
+    def _filing_folder(self, filing_url: str) -> Optional[Tuple[str, str, str]]:
+        """Return (folder_url, cik, accession_no_dashes) for an EDGAR Archives URL"""
+        if not is_sec_url(filing_url):
+            return None
+        match = re.search(r'/Archives/edgar/data/(\d+)/(\d{18})(?:/|$)', urlparse(filing_url).path)
+        if not match:
+            match = re.search(r'/Archives/edgar/data/(\d+)/(\d{10}-\d{2}-\d{6})', urlparse(filing_url).path)
+            if not match:
+                return None
+        cik, accession = match.group(1), match.group(2).replace('-', '')
+        return f"{SEC_EDGAR_BASE}/{cik}/{accession}", cik, accession
+
+    def _filing_index(self, filing_url: str) -> Optional[List[Dict[str, Any]]]:
+        """List the files of a filing with their sizes in bytes (from EDGAR index.json)"""
+        folder = self._filing_folder(filing_url)
+        if not folder:
+            return None
+        response = self.session.get(f"{folder[0]}/index.json", timeout=20)
+        response.raise_for_status()
+        items = response.json().get('directory', {}).get('item', [])
+        files = []
+        for item in items:
+            size = str(item.get('size', '')).strip()
+            files.append({
+                "name": item.get('name', ''),
+                "size_bytes": int(size) if size.isdigit() else None,
+                "url": f"{folder[0]}/{item.get('name', '')}",
+            })
+        return files
+
+    def _document_size(self, filing_url: str) -> Optional[int]:
+        """Exact size in bytes of the document a filing URL points to, or None if unknown"""
+        try:
+            files = self._filing_index(filing_url)
+        except Exception as e:
+            logger.warning(f"Could not read filing index for {filing_url}: {e}")
+            return None
+        if not files:
+            return None
+        name = urlparse(filing_url).path.rstrip('/').rsplit('/', 1)[-1]
+        for f in files:
+            if f["name"] == name:
+                return f["size_bytes"]
+        return None
+
     @safe_sec_call
     @rate_limit()
-    async def get_recent_ipos(self, limit: int = 20) -> Dict[str, Any]:
+    async def get_filing_size(self, filing_url: str) -> Dict[str, Any]:
         """
-        Get recent IPO filings (S-1 forms).
-        
+        Get the exact size of a filing document BEFORE downloading it.
+
+        Use this to decide between reading the text (download_filing_text) and
+        giving the user the link only. Sizes come from the EDGAR filing index.
+
         Args:
-            limit: Number of recent IPOs to return
-            
+            filing_url: Filing document URL (https://www.sec.gov/Archives/edgar/data/...)
+
         Returns:
-            Dictionary containing recent IPO information
+            size_bytes, size_mb, recommendation ('read_text' or 'link_only') and filing_url
         """
-        try:
-            # This is a simplified approach - in practice, you'd need to search across multiple companies
-            # For now, we'll return a placeholder structure
-            return {
-                "message": "IPO search requires broader database access. Use search_filings with form_type='S-1' for specific companies.",
-                "suggestion": "Try: search_filings('company_name', form_type='S-1')"
-            }
-        except Exception as e:
-            return {"error": f"Failed to get recent IPOs: {str(e)}"}
+        if not is_sec_url(filing_url):
+            return {"error": "Only https://*.sec.gov URLs are allowed", "filing_url": filing_url}
+        size = self._document_size(filing_url)
+        if size is None:
+            return {"filing_url": filing_url, "size_bytes": None,
+                    "note": "Size not listed in the EDGAR index. download_filing_text still stops safely at its size limit."}
+        return {
+            "filing_url": filing_url,
+            "size_bytes": size,
+            "size_mb": round(size / (1024 * 1024), 2),
+            "recommendation": "read_text" if size <= MAX_FILING_BYTES else "link_only",
+            "note": f"Documents up to {MAX_FILING_BYTES // (1024 * 1024)}MB can be read as text (in pages) or searched; larger ones are returned as a link."
+        }
+
+    @safe_sec_call
+    @rate_limit()
+    async def get_filing_documents(self, filing_url: str) -> Dict[str, Any]:
+        """
+        List every document in a filing (main document, exhibits, XBRL, XML) with sizes and links.
+
+        Args:
+            filing_url: Any URL inside the filing folder (https://www.sec.gov/Archives/edgar/data/CIK/ACCESSION/...)
+
+        Returns:
+            Dictionary with the filing folder and its documents (name, size_bytes, url)
+        """
+        folder = self._filing_folder(filing_url)
+        if not folder:
+            return {"error": "Not an EDGAR filing URL (expected https://www.sec.gov/Archives/edgar/data/CIK/ACCESSION/...)", "filing_url": filing_url}
+        files = self._filing_index(filing_url) or []
+        documents = [f for f in files if not f["name"].endswith(('-index.html', '-index-headers.html'))]
+        return {
+            "filing_folder": folder[0],
+            "cik": folder[1],
+            "accession_number": f"{folder[2][:10]}-{folder[2][10:12]}-{folder[2][12:]}",
+            "total_documents": len(documents),
+            "documents": documents
+        }
+
+    def _efts(self, params: Dict[str, str], limit: int) -> List[Dict[str, Any]]:
+        """Query EDGAR full-text search and return simplified hits"""
+        response = self.session.get(SEC_EFTS_URL, params=params, timeout=30)
+        response.raise_for_status()
+        hits = response.json().get('hits', {}).get('hits', [])
+        results = []
+        for hit in hits[:max(1, min(int(limit), 100))]:
+            src = hit.get('_source', {})
+            adsh, _, document = hit.get('_id', '').partition(':')
+            ciks = src.get('ciks') or ['']
+            cik = ciks[0].lstrip('0')
+            results.append({
+                "company": (src.get('display_names') or [''])[0],
+                "cik": cik,
+                "form": src.get('form') or src.get('file_type'),
+                "filing_date": src.get('file_date'),
+                "period_ending": src.get('period_ending'),
+                "accession_number": adsh,
+                "filing_url": f"{SEC_EDGAR_BASE}/{cik}/{adsh.replace('-', '')}/{document}" if cik and adsh else None,
+            })
+        return results
+
+    @safe_sec_call
+    @rate_limit()
+    async def full_text_search(
+        self,
+        query: str,
+        form_type: Optional[Union[str, List[str]]] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 20
+    ) -> Dict[str, Any]:
+        """
+        Search the full text of every EDGAR filing since 2001 (words or "exact phrase").
+
+        Args:
+            query: Words to find, e.g. 'tariffs' or '"going concern"' for an exact phrase
+            form_type: Optional form filter, e.g. '8-K' or '10-K,10-Q'
+            start_date: Optional YYYY-MM-DD (default: one year ago; use '2001-01-01' for all history)
+            end_date: Optional YYYY-MM-DD (default: today)
+            limit: Max results (1-100, default 20)
+
+        Returns:
+            Matching filings (newest first) with company, form, date and a link to the matching document
+        """
+        query = str(query or '').strip()
+        if not query:
+            return {"error": "query is required"}
+        params = {"q": query}
+        forms = form_list(form_type)
+        if forms:
+            params["forms"] = ",".join(forms)
+        dates = DateRangeValidator(start_date=start_date, end_date=end_date)
+        params.update(dateRange="custom",
+                      startdt=dates.start_date or (date.today() - timedelta(days=365)).isoformat(),
+                      enddt=dates.end_date or date.today().isoformat())
+        results = self._efts(params, 100)
+        results.sort(key=lambda r: r.get("filing_date") or "", reverse=True)
+        results = results[:max(1, min(int(limit), 100))]
+        return {"query": query, "forms": forms or "all", "date_range": f"{params['startdt']} to {params['enddt']}",
+                "total_results": len(results), "results": results}
+
+    @safe_sec_call
+    @rate_limit()
+    async def get_recent_ipos(self, limit: int = 20, days: int = 30) -> Dict[str, Any]:
+        """
+        Get recent IPO activity from EDGAR.
+
+        Args:
+            limit: Max companies per list (default 20)
+            days: Look-back window in days (default 30)
+
+        Returns:
+            priced: final prospectuses (424B4, filed when an offering is priced)
+            registrations: new S-1 / F-1 registration statements (companies preparing to list)
+        """
+        days = max(1, min(int(days), 365))
+        window = {"dateRange": "custom", "startdt": (date.today() - timedelta(days=days)).isoformat(),
+                  "enddt": date.today().isoformat()}
+
+        def unique(rows):
+            seen, out = set(), []
+            for row in rows:
+                if row["cik"] not in seen:
+                    seen.add(row["cik"])
+                    out.append(row)
+            return out[:limit]
+
+        priced = unique(self._efts({**window, "forms": "424B4"}, 100))
+        registrations = unique(self._efts({**window, "forms": "S-1,F-1"}, 100))
+        return {
+            "window": f"last {days} days",
+            "priced": priced,
+            "registrations": registrations,
+            "note": "424B4 = priced offering (IPOs and some follow-on offerings). S-1/F-1 = registration filed, not yet priced."
+        }
+
+    @safe_sec_call
+    @rate_limit()
+    async def get_13f_holdings(self, ticker_or_cik: str, limit: int = 25) -> Dict[str, Any]:
+        """
+        Get the latest 13F portfolio of an institutional investment manager.
+
+        Args:
+            ticker_or_cik: Manager ticker (e.g. 'BRK-B') or CIK (e.g. '1350694' for Bridgewater)
+            limit: Number of top positions to return (default 25)
+
+        Returns:
+            Report period, total value and the largest positions (issuer, CUSIP, value, shares)
+        """
+        cik = ticker_to_cik(str(ticker_or_cik))
+        if not cik:
+            return {"error": f"Could not resolve '{ticker_or_cik}' to a CIK. Pass the manager's CIK."}
+        response = self.session.get(f"{SEC_API_BASE}/submissions/CIK{cik}.json", timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        recent = data.get('filings', {}).get('recent', {})
+        forms = recent.get('form', [])
+        index = next((i for i, f in enumerate(forms) if f in ("13F-HR", "13F-HR/A")), None)
+        if index is None:
+            return {"error": f"No 13F-HR filing found for {data.get('name', cik)}", "cik": cik}
+        accession = recent['accessionNumber'][index]
+        folder = f"{SEC_EDGAR_BASE}/{int(cik)}/{accession.replace('-', '')}"
+        files = self._filing_index(folder + "/") or []
+        table = next((f for f in files if f["name"].lower().endswith('.xml') and f["name"].lower() != 'primary_doc.xml'), None)
+        if not table:
+            return {"error": "13F information table not found", "filing_folder": folder}
+        root = ET.fromstring(self.session.get(table["url"], timeout=30).content)
+
+        def text(node, tag):
+            found = node.find(f'.//{{*}}{tag}')
+            return found.text.strip() if found is not None and found.text else ''
+
+        positions = {}
+        for row in root.iter():
+            if not row.tag.endswith('infoTable'):
+                continue
+            key = (text(row, 'nameOfIssuer'), text(row, 'cusip'), text(row, 'putCall'))
+            value = float(text(row, 'value') or 0)
+            shares = float(text(row, 'sshPrnamt') or 0)
+            current = positions.setdefault(key, {"issuer": key[0], "cusip": key[1], "class": text(row, 'titleOfClass'),
+                                                 "put_call": key[2] or None, "value_usd": 0.0, "shares": 0.0})
+            current["value_usd"] += value
+            current["shares"] += shares
+        ranked = sorted(positions.values(), key=lambda p: p["value_usd"], reverse=True)
+        total = sum(p["value_usd"] for p in ranked)
+        for p in ranked:
+            p["weight_pct"] = round(100 * p["value_usd"] / total, 2) if total else None
+        return {
+            "manager": data.get('name'),
+            "cik": cik,
+            "form": forms[index],
+            "filing_date": recent['filingDate'][index],
+            "report_period": (recent.get('reportDate') or [''] * len(forms))[index],
+            "total_value_usd": total,
+            "total_positions": len(ranked),
+            "top_positions": ranked[:max(1, int(limit))],
+            "filing_folder": folder,
+            "note": "Values in US dollars as reported (filings before 2023 reported thousands)."
+        }
+
+    @safe_sec_call
+    @rate_limit()
+    async def get_xbrl_frames(
+        self,
+        concept: str,
+        period: str,
+        unit: str = "USD",
+        taxonomy: str = "us-gaap",
+        limit: int = 20
+    ) -> Dict[str, Any]:
+        """
+        Compare one financial concept across ALL reporting companies for one period.
+
+        Args:
+            concept: XBRL tag, e.g. 'Revenues', 'NetIncomeLoss', 'Assets'
+            period: 'CY2024' (annual), 'CY2024Q3' (quarter) or 'CY2024Q4I' (balance-sheet instant)
+            unit: 'USD' (default), 'USD-per-shares', 'shares'
+            taxonomy: 'us-gaap' (default), 'ifrs-full', 'dei'
+            limit: Number of top companies to return (default 20)
+
+        Returns:
+            Companies ranked by value for that concept and period
+        """
+        if not re.match(r'^[A-Za-z0-9_]+$', concept or ''):
+            return {"error": f"Invalid concept: {concept}"}
+        period = str(period).upper()
+        if not re.match(r'^CY\d{4}(Q[1-4]I?)?$', period):
+            return {"error": "period must look like CY2024, CY2024Q3 or CY2024Q4I"}
+        if not re.match(r'^[A-Za-z0-9\-]+$', unit or '') or not re.match(r'^[a-z\-]+$', taxonomy or ''):
+            return {"error": "Invalid unit or taxonomy"}
+        response = self.session.get(f"{SEC_API_BASE}/api/xbrl/frames/{taxonomy}/{concept}/{unit}/{period}.json", timeout=30)
+        if response.status_code == 404:
+            return {"error": f"No data for {taxonomy}/{concept}/{unit}/{period}"}
+        response.raise_for_status()
+        data = response.json()
+        rows = sorted(data.get('data', []), key=lambda r: r.get('val') or 0, reverse=True)
+        return {
+            "concept": concept,
+            "label": data.get('label'),
+            "period": period,
+            "unit": unit,
+            "total_companies": len(rows),
+            "top": [{"company": r.get('entityName'), "cik": r.get('cik'), "value": r.get('val'),
+                     "period_end": r.get('end'), "accession_number": r.get('accn')}
+                    for r in rows[:max(1, int(limit))]]
+        }
 
     # ============================================================
     # UTILITY & TESTING TOOLS
@@ -1497,6 +1955,15 @@ class Tools:
             ("Full Content Download", lambda: self.get_filing_content("AAPL", get_full_content=True)),
             ("Download Filing Text Tool", lambda: self.download_filing_text("https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/aapl-20230930.htm", max_length=1000)),
             ("Recent IPOs", lambda: self.get_recent_ipos(limit=5)),
+            ("Filing Size", lambda: self.get_filing_size("https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/aapl-20230930.htm")),
+            ("Filing Documents", lambda: self.get_filing_documents("https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/aapl-20230930.htm")),
+            ("Search Inside Filing", lambda: self.download_filing_text("https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/aapl-20230930.htm", search="iPhone")),
+            ("Full-Text Search", lambda: self.full_text_search('"going concern"', form_type="8-K", limit=3)),
+            ("13F Holdings", lambda: self.get_13f_holdings("BRK-B", limit=5)),
+            ("XBRL Frames", lambda: self.get_xbrl_frames("Revenues", "CY2024", limit=5)),
+            ("Older Filings", lambda: self.get_company_filings("AAPL", form_type="10-K", limit=15)),
+            ("Share Class Ticker", lambda: self.get_company_filings("BRK.B", limit=1)),
+            ("Schedule 13D Only", lambda: self.get_beneficial_ownership("AAPL", limit=1, schedule="13D")),
             ("Search Filings", lambda: self.search_filings("Apple", limit=3)),
             ("Dynamic Ticker", lambda: self.get_company_filings("HOOD", limit=1)),
             ("Available Functions", lambda: {"functions": self.get_available_functions()})
@@ -1745,10 +2212,11 @@ class Tools:
         3. Call: get_filing_content(ticker='GME', specific_metrics=['NetIncomeLoss', ...])
         4. Calculate TTM from 5 historical values (last 4 quarters + 1 prior)
 
-        FILE HANDLING:
-        - Files <1MB: Automatically downloaded and returned in full_content field
-        - Files ≥1MB: Link provided to user, AI warned via ai_note field
-        - Keep filing_url for user manual download if needed
+        FILE HANDLING (get_full_content=True):
+        - The exact document size is checked first (EDGAR filing index)
+        - Up to 25MB: first 50,000 characters in full_content; if has_more, continue with
+          download_filing_text(filing_url, offset=next_offset) or search it with search='keyword'
+        - Over 25MB: link only (file_too_large=True), AI told via ai_note
 
         Args:
             ticker: Stock ticker symbol (e.g., 'GME', 'AAPL')
@@ -1766,9 +2234,9 @@ class Tools:
             - filing_date, filing_type: Filing metadata
             - mode: "generic" or "specific"
             - metrics_returned, values_per_metric: Data shape info
-            - full_content: (if file <1MB) Complete filing text for analysis
-            - file_size_mb, filing_url: (if file ≥1MB) Link and size info + ai_note warning
-            - ai_note: (if file too large) Explicit warning for AI explaining situation
+            - content_mode: 'text' or 'link_only'
+            - full_content, has_more, next_offset: first page of the filing text
+            - file_size_mb, filing_url, ai_note: size, link and what to do next
         """
         try:
             logger.info(f"Fetching SEC data for {ticker}...")
@@ -1842,38 +2310,22 @@ class Tools:
                 logger.info(f"Checking filing size for URL: {filing_url}")
 
                 try:
-                    MAX_FILE_SIZE = 1024 * 1024  # 1MB limit
-                    # Streamed download, aborted as soon as it passes the limit
-                    try:
-                        content_response = self.session.get(filing_url, timeout=30, max_bytes=MAX_FILE_SIZE)
-                        file_size = len(content_response.content)
-                    except ResponseTooLargeError as e:
-                        content_response = None
-                        file_size = max(e.size, MAX_FILE_SIZE)
-
-                    logger.info(f"Filing size: {file_size} bytes")
-
-                    if content_response is None:
-                        # File >= 1MB - just give link and warn AI
-                        response_data["filing_url"] = filing_url
-                        response_data["file_size_mb"] = round(file_size / (1024 * 1024), 2)
-                        response_data["file_too_large"] = True
-                        response_data["ai_note"] = f"⚠️ NOTICE: The {filing_type} filing for {company_name} is {response_data['file_size_mb']}MB, which exceeds our 1MB processing limit. We've sent the user a link to download the full filing directly from SEC EDGAR. The user should download and analyze it manually, then provide you with the specific data/calculations needed. Link: {filing_url}"
-                        response_data["note"] = f"Filing is {response_data['file_size_mb']}MB (>=1MB limit). Download: {filing_url}"
-                    else:
-                        # File < 1MB - already downloaded, read it
-                        content_response.raise_for_status()
-
-                        # Extract clean text from HTML for AI context efficiency
-                        content = extract_text_from_html(content_response.text)
-                        response_data["full_content"] = content
-                        response_data["content_size_kb"] = round(len(content) / 1024, 2)
-                        logger.info(f"✓ Read {response_data['content_size_kb']}KB")
-
-                except Exception as e:
-                    logger.error(f"Error checking file size: {e}")
+                    filing = self._read_filing(filing_url, max_length=TEXT_PAGE_CHARS)
                     response_data["filing_url"] = filing_url
-                    response_data["note"] = f"Could not check size. Link: {filing_url}"
+                    response_data["content_mode"] = filing["mode"]
+                    response_data["file_size_mb"] = filing.get("size_mb")
+                    response_data["ai_note"] = filing.get("ai_note")
+                    if filing["mode"] == "link_only":
+                        response_data["file_too_large"] = True
+                    else:
+                        response_data["full_content"] = filing["content"]
+                        response_data["total_characters"] = filing["total_characters"]
+                        response_data["has_more"] = filing["has_more"]
+                        response_data["next_offset"] = filing["next_offset"]
+                except Exception as e:
+                    logger.error(f"Error reading filing: {e}")
+                    response_data["filing_url"] = filing_url
+                    response_data["note"] = f"Could not read the filing text. Link: {filing_url}"
 
             logger.info(f"✓ Response ready")
             return response_data
@@ -1887,135 +2339,25 @@ class Tools:
 
     def get_available_functions(self) -> List[Dict[str, Any]]:
         """
-        Get list of all available SEC-AI functions for OpenWebUI integration.
+        List every callable SEC-AI function with its parameters and summary.
 
         Returns:
-            List of function definitions
+            List of {"name", "description", "parameters"} built from the code itself
         """
-        functions = [
-            {
-                "name": "get_company_filings",
-                "description": "Get SEC filings for a company by ticker symbol",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "form_type": "SEC form type (optional, e.g., '10-K', '10-Q', '8-K')",
-                    "limit": "Maximum number of filings (default: 10)",
-                    "start_date": "Start date YYYY-MM-DD (optional)",
-                    "end_date": "End date YYYY-MM-DD (optional)"
-                }
-            },
-            {
-                "name": "get_latest_10k",
-                "description": "Get the latest 10-K annual report for a company",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)"
-                }
-            },
-            {
-                "name": "get_latest_10q",
-                "description": "Get the latest 10-Q quarterly report for a company",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)"
-                }
-            },
-            {
-                "name": "get_recent_8k_filings",
-                "description": "Get recent 8-K current reports for a company",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "limit": "Number of 8-K filings to return (default: 5)"
-                }
-            },
-            {
-                "name": "get_proxy_statements",
-                "description": "Get proxy statements (DEF 14A) for a company",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "limit": "Number of proxy statements (default: 3)"
-                }
-            },
-            {
-                "name": "get_insider_transactions",
-                "description": "Get insider trading transactions for a company",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "limit": "Number of transactions (default: 20)"
-                }
-            },
-            {
-                "name": "get_beneficial_ownership",
-                "description": "Get beneficial ownership reports (13D, 13G) for a company",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "limit": "Number of reports (default: 10)"
-                }
-            },
-            {
-                "name": "get_company_facts",
-                "description": "Get company facts and financial metrics from SEC XBRL data",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)"
-                }
-            },
-            {
-                "name": "get_company_concept",
-                "description": "Get specific financial concept data over time",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "concept": "XBRL concept (e.g., 'Revenues', 'NetIncomeLoss')"
-                }
-            },
-            {
-                "name": "get_available_metrics",
-                "description": "Discover and search all available financial metrics for a company from SEC XBRL data. Use this to find metric names before calling get_filing_content with specific_metrics.",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "search_term": "Optional search term to filter metrics (e.g., 'EBITDA', 'Revenue', 'Debt', 'Cash')"
-                }
-            },
-            {
-                "name": "download_filing_text",
-                "description": "Download and extract clean text from any SEC filing URL. Use this when you have a filing_url and need to analyze its full text content.",
-                "parameters": {
-                    "filing_url": "Full URL to the SEC filing (required)",
-                    "max_length": "Maximum characters to return (optional, default 1,000,000)"
-                }
-            },
-            {
-                "name": "search_filings",
-                "description": "Search SEC filings by company name or criteria",
-                "parameters": {
-                    "query": "Search query (required)",
-                    "form_type": "SEC form type filter (optional)",
-                    "start_date": "Start date YYYY-MM-DD (optional)",
-                    "end_date": "End date YYYY-MM-DD (optional)",
-                    "limit": "Maximum results (default: 20)"
-                }
-            },
-            {
-                "name": "get_sec_api_status",
-                "description": "Check SEC API status and connectivity",
-                "parameters": {}
-            },
-            {
-                "name": "get_filing_content",
-                "description": "Get SEC financial data with optional full text content. By default returns essential financial metrics and links. Use get_full_content=True to attempt downloading the full filing text (limit 1MB).",
-                "parameters": {
-                    "ticker": "Stock ticker symbol (required)",
-                    "filing_type": "Type of filing - 10-Q, 10-K, 8-K (default: 10-Q)",
-                    "get_full_content": "Boolean: If True, attempts to download and return full text content (default: False)",
-                    "specific_metrics": "Optional list of specific XBRL metric names to fetch"
-                }
-            },
-            {
-                "name": "run_self_test",
-                "description": "Run comprehensive self-test of all SEC-AI tools",
-                "parameters": {}
-            }
-        ]
-        
+        functions = []
+        for name, method in inspect.getmembers(self, predicate=inspect.ismethod):
+            if name.startswith('_') or name in ('get_available_functions', 'run_self_test'):
+                continue
+            doc = inspect.getdoc(method) or ''
+            params = {}
+            for pname, param in inspect.signature(method).parameters.items():
+                params[pname] = "required" if param.default is inspect.Parameter.empty else f"optional, default {param.default!r}"
+            functions.append({
+                "name": name,
+                "description": doc.strip().splitlines()[0] if doc.strip() else "",
+                "parameters": params
+            })
         return functions
-
 
 # ============================================================
 # OPENWEBUI FUNCTION EXPORTS
@@ -2049,9 +2391,9 @@ async def get_insider_transactions(ticker: str, limit: int = 20) -> dict:
     """Get insider trading transactions for a company"""
     return await tools.get_insider_transactions(ticker, limit)
 
-async def get_beneficial_ownership(ticker: str, limit: int = 10) -> dict:
+async def get_beneficial_ownership(ticker: str, limit: int = 10, schedule: str = "all") -> dict:
     """Get beneficial ownership reports for a company"""
-    return await tools.get_beneficial_ownership(ticker, limit)
+    return await tools.get_beneficial_ownership(ticker, limit, schedule)
 
 async def get_company_facts(ticker: str) -> dict:
     """Get company facts from SEC XBRL data"""
@@ -2073,9 +2415,23 @@ async def get_sec_api_status() -> dict:
     """Check SEC API status and connectivity"""
     return await tools.get_sec_api_status()
 
-async def download_filing_text(filing_url: str, max_length: int = 1000000) -> dict:
-    """Download and extract clean text from any SEC filing URL"""
-    return await tools.download_filing_text(filing_url, max_length)
+async def download_filing_text(filing_url: str, max_length: int = TEXT_PAGE_CHARS, offset: int = 0, search: str = None) -> dict:
+    return await tools.download_filing_text(filing_url, max_length, offset, search)
+
+async def get_filing_size(filing_url: str) -> dict:
+    return await tools.get_filing_size(filing_url)
+
+async def get_filing_documents(filing_url: str) -> dict:
+    return await tools.get_filing_documents(filing_url)
+
+async def full_text_search(query: str, form_type: str = None, start_date: str = None, end_date: str = None, limit: int = 20) -> dict:
+    return await tools.full_text_search(query, form_type, start_date, end_date, limit)
+
+async def get_13f_holdings(ticker_or_cik: str, limit: int = 25) -> dict:
+    return await tools.get_13f_holdings(ticker_or_cik, limit)
+
+async def get_xbrl_frames(concept: str, period: str, unit: str = "USD", taxonomy: str = "us-gaap", limit: int = 20) -> dict:
+    return await tools.get_xbrl_frames(concept, period, unit, taxonomy, limit)
 
 async def get_filing_content(ticker: str, filing_type: str = "10-Q", get_full_content: bool = False, specific_metrics: list = None) -> dict:
     """
