@@ -110,6 +110,86 @@ SEC_HEADERS = {
     "Accept": "*/*"
 }
 
+# Network safety limits (decoded bytes, so gzip bombs are capped too)
+MAX_RESPONSE_BYTES = 50 * 1024 * 1024
+MAX_FILING_BYTES = 25 * 1024 * 1024
+MAX_REDIRECTS = 5
+
+
+class SecurityBlockedError(ValueError):
+    """Raised when a request or redirect targets a host outside sec.gov"""
+
+
+class ResponseTooLargeError(ValueError):
+    """Raised when a response body exceeds the allowed byte limit"""
+
+    def __init__(self, url: str, size: int, limit: int):
+        super().__init__(f"Response from {url} exceeds {limit} bytes")
+        self.url = url
+        self.size = size
+        self.limit = limit
+
+
+def is_sec_url(url: str) -> bool:
+    """True only for https URLs whose host is sec.gov or a subdomain of it"""
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and (host == "sec.gov" or host.endswith(".sec.gov"))
+
+
+class SecSession(requests.Session):
+    """
+    requests.Session restricted to sec.gov.
+
+    Every request, and every redirect hop, is checked against is_sec_url before
+    it is sent. Redirects are followed manually so an off-domain Location is
+    never fetched. Bodies are streamed and capped at max_bytes regardless of
+    the Content-Length the server reports.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.headers.update(SEC_HEADERS)
+        self.max_redirects = MAX_REDIRECTS
+
+    def request(self, method, url, max_bytes: int = MAX_RESPONSE_BYTES, **kwargs):
+        kwargs.pop("allow_redirects", None)
+        kwargs.pop("stream", None)
+        for _ in range(MAX_REDIRECTS + 1):
+            if not is_sec_url(url):
+                raise SecurityBlockedError(f"Blocked non-SEC URL: {url}")
+            response = super().request(method, url, allow_redirects=False, stream=True, **kwargs)
+            if not response.is_redirect:
+                self._read_capped(response, max_bytes)
+                return response
+            url = urljoin(response.url, response.headers["location"])
+            response.close()
+            if response.status_code == 303 or (response.status_code in (301, 302) and method.upper() == "POST"):
+                method = "GET"
+                kwargs.pop("data", None)
+                kwargs.pop("json", None)
+        raise requests.exceptions.TooManyRedirects(f"Exceeded {MAX_REDIRECTS} redirects")
+
+    @staticmethod
+    def _read_capped(response: requests.Response, max_bytes: int) -> None:
+        declared = response.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > max_bytes:
+            response.close()
+            raise ResponseTooLargeError(response.url, int(declared), max_bytes)
+        body = bytearray()
+        try:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                body.extend(chunk)
+                if len(body) > max_bytes:
+                    raise ResponseTooLargeError(response.url, len(body), max_bytes)
+        finally:
+            response.close()
+        response._content = bytes(body)
+        response._content_consumed = True
+
 # SEC Form Types
 SEC_FORM_TYPES = {
     "10-K": "Annual Report",
@@ -481,11 +561,8 @@ def ticker_to_cik(ticker: str) -> Optional[str]:
     # Tier 3: Try SEC company_tickers.json endpoint (dynamic lookup)
     try:
         logger.debug(f"  Fetching SEC company_tickers.json...")
-        response = requests.get(
-            f"{SEC_BASE_URL}/files/company_tickers.json",
-            headers=SEC_HEADERS,
-            timeout=10
-        )
+        with SecSession() as session:
+            response = session.get(f"{SEC_BASE_URL}/files/company_tickers.json", timeout=10)
 
         if response.status_code == 200:
             tickers_data = response.json()
@@ -555,8 +632,7 @@ class Tools:
 
     def __init__(self):
         """Initialize SEC-AI Tools"""
-        self.session = requests.Session()
-        self.session.headers.update(SEC_HEADERS)
+        self.session = SecSession()
         logger.info("SEC-AI Tools initialized")
 
     # ============================================================
@@ -578,36 +654,26 @@ class Tools:
         """
         logger.info(f"=== download_filing_text({filing_url}) ===")
 
-        # Security: Restrict to official SEC domains to prevent SSRF
-        try:
-            parsed_url = urlparse(filing_url)
-            domain = parsed_url.netloc.lower()
-            if not (domain == "sec.gov" or domain.endswith(".sec.gov")):
-                logger.error(f"Security blocked: Attempted access to non-SEC domain: {domain}")
-                return {
-                    "error": "Security violation: Only official SEC EDGAR domains (sec.gov) are allowed.",
-                    "filing_url": filing_url
-                }
-        except Exception as e:
-            logger.error(f"Error validating URL: {e}")
-            return {"error": "Invalid URL provided", "filing_url": filing_url}
+        # Security: Restrict to official SEC domains to prevent SSRF.
+        # SecSession re-checks every redirect hop and caps the streamed body.
+        if not is_sec_url(filing_url):
+            logger.error(f"Security blocked: Attempted access to non-SEC URL: {filing_url}")
+            return {
+                "error": "Security violation: Only official SEC EDGAR URLs (https://*.sec.gov) are allowed.",
+                "filing_url": filing_url
+            }
 
         try:
-            # Check size first to avoid downloading massive files
-            head_response = self.session.head(filing_url, timeout=10, allow_redirects=True)
-            compressed_size = int(head_response.headers.get('content-length', 0))
-
-            # If compressed size is > 5MB, it's definitely too big for AI context
-            if compressed_size > 5 * 1024 * 1024:
+            logger.info(f"Downloading filing: {filing_url}")
+            try:
+                response = self.session.get(filing_url, timeout=60, max_bytes=MAX_FILING_BYTES)
+            except ResponseTooLargeError as e:
                 return {
                     "error": "Filing is too large for automatic processing",
-                    "compressed_size_mb": round(compressed_size / (1024 * 1024), 2),
+                    "size_mb": round(e.size / (1024 * 1024), 2),
                     "filing_url": filing_url,
-                    "note": "The filing exceeds 5MB (compressed), which is too large for AI context. Please download and analyze it manually."
+                    "note": f"The filing exceeds {MAX_FILING_BYTES // (1024 * 1024)}MB, which is too large for AI context. Please download and analyze it manually."
                 }
-
-            logger.info(f"Downloading filing: {filing_url}")
-            response = self.session.get(filing_url, timeout=60)
             response.raise_for_status()
 
             # Extract text
@@ -1776,14 +1842,18 @@ class Tools:
                 logger.info(f"Checking filing size for URL: {filing_url}")
 
                 try:
-                    # Check size WITHOUT downloading
-                    head_response = self.session.head(filing_url, timeout=10, allow_redirects=True)
-                    file_size = int(head_response.headers.get('content-length', 0))
                     MAX_FILE_SIZE = 1024 * 1024  # 1MB limit
+                    # Streamed download, aborted as soon as it passes the limit
+                    try:
+                        content_response = self.session.get(filing_url, timeout=30, max_bytes=MAX_FILE_SIZE)
+                        file_size = len(content_response.content)
+                    except ResponseTooLargeError as e:
+                        content_response = None
+                        file_size = max(e.size, MAX_FILE_SIZE)
 
                     logger.info(f"Filing size: {file_size} bytes")
 
-                    if file_size >= MAX_FILE_SIZE:
+                    if content_response is None:
                         # File >= 1MB - just give link and warn AI
                         response_data["filing_url"] = filing_url
                         response_data["file_size_mb"] = round(file_size / (1024 * 1024), 2)
@@ -1791,9 +1861,7 @@ class Tools:
                         response_data["ai_note"] = f"⚠️ NOTICE: The {filing_type} filing for {company_name} is {response_data['file_size_mb']}MB, which exceeds our 1MB processing limit. We've sent the user a link to download the full filing directly from SEC EDGAR. The user should download and analyze it manually, then provide you with the specific data/calculations needed. Link: {filing_url}"
                         response_data["note"] = f"Filing is {response_data['file_size_mb']}MB (>=1MB limit). Download: {filing_url}"
                     else:
-                        # File < 1MB - download and read
-                        logger.info(f"Downloading filing ({file_size} bytes)...")
-                        content_response = self.session.get(filing_url, timeout=30)
+                        # File < 1MB - already downloaded, read it
                         content_response.raise_for_status()
 
                         # Extract clean text from HTML for AI context efficiency
