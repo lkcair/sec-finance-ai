@@ -2,7 +2,7 @@
 
 ### AI-Powered SEC Filing Integration for Your AI Assistant
 
-**Natural Language SEC Integration** - Access 19+ SEC filing tools directly from OpenWebUI, Claude, ChatGPT, or any AI assistant. Get 10-K, 10-Q, 8-K filings, 13D/13G beneficial ownership, insider trading data, company facts (XBRL), and institutional holdings via simple natural language queries.
+**Natural Language SEC Integration** - Access 23 SEC filing tools directly from OpenWebUI, Claude, ChatGPT, or any AI assistant. Get 10-K, 10-Q, 8-K filings, 13D/13G beneficial ownership, insider trading data, company facts (XBRL), and institutional holdings via simple natural language queries.
 
 **Author**: lucas0
 
@@ -55,7 +55,7 @@ Skill page: [Openclaw SEC](https://clawhub.ai/lkcair/sec)
 ## 🚨 CRITICAL: SEC User-Agent Requirement
 The SEC requires all programmatic requests to identify the user/company and provide a contact email. **Requests without a proper User-Agent will be blocked (403 Forbidden).**
 
-If you are using this as a standalone script, locate `SEC_HEADERS` in `sec_finance_ai.py` and update it:
+Set the `SEC_USER_AGENT` environment variable (for example `SEC_USER_AGENT="MyResearchApp admin@example.com"`), or, if you are using this as a standalone script, locate `SEC_HEADERS` in `sec_finance_ai.py` and update it:
 ```python
 SEC_HEADERS = {
     "User-Agent": "MyResearchApp admin@example.com", # <--- UPDATE THIS
@@ -70,9 +70,17 @@ SEC_HEADERS = {
 
 ✅ **Monolithic Codebase:** Single-file script allowing easy integration
 
-✅ **40+ SEC Filing Tools** - Full access to EDGAR database
+✅ **23 SEC Filing Tools** - Full access to EDGAR database
 
-✅ **Full Text Retrieval** - Smart retrieval of full filing content with automatic HTML cleaning and size limits
+✅ **Read, Search or Link** - Exact filing size checked before download; read filings in 50,000-character pages, search inside a filing for a word or phrase, or get the link only for filings over 25MB
+
+✅ **Full-Text Search** - Search the text of every EDGAR filing since 2001 by word or exact phrase
+
+✅ **13F Holdings** - Latest portfolio of any institutional manager (e.g. Berkshire Hathaway) with weights
+
+✅ **Cross-Company XBRL** - Rank all companies by one metric for one period (e.g. 2024 revenue)
+
+✅ **Recent IPOs** - Priced offerings (424B4) and new S-1/F-1 registrations
 
 ✅ **Foreign Issuer Support** - Full support for **20-F** and **6-K** filings
 
@@ -102,7 +110,11 @@ SEC_HEADERS = {
 | **8-K** | Current Report (US) | Material events and corporate changes |
 | **6-K** | Current Report (Foreign) | Material events for international companies |
 | **DEF 14A** | Proxy Statement | Executive compensation, shareholder voting |
-| **S-1** | Registration Statement | IPO filings and new securities |
+| **S-1 / F-1** | Registration Statement | IPO filings and new securities |
+| **424B4** | Final Prospectus | Priced IPOs and offerings |
+| **40-F** | Annual Report (Canadian) | Annual financials for Canadian issuers |
+| **S-8, S-3, S-4, 425** | Registrations and Mergers | Employee plans, shelf offerings, business combinations |
+| **D, 144** | Exempt Offerings and Sales | Private placements, proposed insider sales |
 | **3, 4, 5** | Insider Trading | Officer and director transactions |
 | **13D/13G** | Beneficial Ownership | Large shareholder positions (>5%) & merger alerts |
 | **13F** | Institutional Holdings | Quarterly institutional positions |
@@ -129,6 +141,11 @@ SEC_HEADERS = {
 ### Advanced Searches
 - "Find all 6-K filings for Alibaba"
 - "Get Schedule 13D for EBAY"
+- "Search all 8-Ks from this year that mention \"going concern\""
+- "What are Berkshire Hathaway's top holdings in its latest 13F?"
+- "Which companies had the highest revenue in 2024?"
+- "What does Apple's latest 10-K say about Greater China?"
+- "Show recent IPOs"
 
 ---
 
@@ -140,7 +157,7 @@ AI can self-test by asking:
 "Run self-test on SEC tools"
 ```
 
-This will test all 19+ functions and report results with **100% pass rate**.
+This runs 28 checks across all 23 functions and reports results with **100% pass rate**.
 
 ---
 
