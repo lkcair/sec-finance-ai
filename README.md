@@ -30,7 +30,7 @@
 # 🚀 Quick Start
 ## 🦞 (Main) Installation with OpenClaw
 ```bash
-openclaw skills install sec
+openclaw skills install @lkcair/sec
 ```
 On OpenClaw, start asking questions like:
    - "What's Apple's latest 10-K about?"
