@@ -8,7 +8,7 @@
 
 **Github**: [Github](https://github.com/lkcair/)
 
-**Version**: 1.3.1
+**Version**: 1.4.2
 
 **License**: MIT
 
@@ -182,5 +182,5 @@ This runs 28 checks across all 23 functions and reports results with **100% pass
 
 *SEC-AI is not affiliated with the U.S. Securities and Exchange Commission. All data is sourced from public SEC databases with proper attribution.*
 
-*Version: 1.3.1*
+*Version: 1.4.2*
 *Status: Production Ready ✅*
