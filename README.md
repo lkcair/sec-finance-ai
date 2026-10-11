@@ -16,7 +16,7 @@
 
 **Repository**: https://github.com/lkcair/sec-finance-ai
 
-**OpenWebUI Page**: Download sec-finance-ai on the [OpenWebUI Website](https://openwebui.com/posts/fc928bb1-1ae8-462d-a4c1-ae5ede39aaa7)
+**OpenWebUI**: paste [sec_finance_ai.py](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) into Workspace → Tools (see OpenWebUI Installation below)
 
 **OpenClaw Page**: [https://clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec)
 
