@@ -16,7 +16,7 @@
 
 **Repository**: https://github.com/lkcair/sec-finance-ai
 
-**OpenWebUI**: paste [sec_finance_ai.py](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) into Workspace → Tools (see OpenWebUI Installation below)
+**OpenWebUI Page**: Download sec-finance-ai on the [OpenWebUI Website](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585)
 
 **OpenClaw Page**: [https://clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec)
 
@@ -40,7 +40,17 @@ Skill page: [Openclaw SEC](https://clawhub.ai/lkcair/sec)
 
 - **(Alternative) OpenClaw Manual**: Download Skill at [https://clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec) and upload manually to OpenClaw skills location.
 
-## 🚀 OpenWebUI Installation
+## 🚀 OpenWebUI (Main) Automatic Installation
+1. Download `sec-finance-ai` on the [OpenWebUI Website](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585)
+2. Click on **Get**
+3. Select your OpenWebUI instance.
+4. Click on **Save** inside your OpenWebUI installation.
+5. **Enable** the tool on the Model or Chat.
+6. Start asking questions like:
+   - "Get Apple's latest 10-K"
+   - "Show GameStop's recent 8-K filings"
+
+## 🚀 OpenWebUI (Alternative) Manual Installation
 1. Copy the entire [sec_finance_ai.py](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) file
 2. Go to OpenWebUI → **Workspace** → **Tools**
 3. Click **"+"** to create new TOOL
