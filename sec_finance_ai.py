@@ -1,55 +1,41 @@
 """
 title: sec-finance-ai - AI-Powered SEC Filing Integration
-description: Complete SEC Filing Data Suite - 23 tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, Claude, ChatGPT, and any AI assistant.
+description: Complete SEC Filing Data Suite - 23 tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, OpenClaw, and any AI assistant with function calling.
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 1.4.2
+version: 2.0.0
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
 
 OPENWEBUI INSTALLATION:
 1. Copy this entire file
-2. Go to OpenWebUI - Admin Panel - Functions
-3. Click "+" to create new function
-4. Paste this code
-5. Save and enable
+2. Go to OpenWebUI > Workspace > Tools
+3. Click "+" to create a new tool
+4. Paste this code and click Save
+5. Enable the tool on the model or in the chat
 6. Start asking questions like "Get Apple's latest 10-K filing" or "Show Tesla's recent 8-K filings"
 
-INTEGRATION WITH OTHER AI TOOLS:
-- Claude Desktop: Add as MCP server
-- ChatGPT Custom GPT: Import as action
-- LangChain: Use as Tool
-- Python: from sec_finance_ai import Tools; tools = Tools()
-- API: Deploy as FastAPI/Flask endpoint
+OTHER WAYS TO USE IT:
+- OpenClaw: openclaw skills install @lkcair/sec
+- Python: from sec_finance_ai import Tools; tools = Tools()  (every tool is an async method)
 
 FEATURES:
-- 23 SEC tools: filings, full-text search, filing text with paging/search/link-only, 13F, XBRL frames
-- Multi-filing support: 10-K, 10-Q, 8-K, DEF 14A, S-1, and more
-- Real-time SEC filing notifications and searches
-- Company facts and financial data from SEC XBRL
-- Insider trading and ownership data (Forms 3, 4, 5)
-- Institutional holdings (13F filings)
-- Executive compensation data
-- Risk factors and MD&A extraction
-- Financial statement parsing and analysis
-- SEC comment letters and responses
-- Mutual fund holdings (N-PORT, N-Q)
-- Investment advisor filings (ADV)
-- Beneficial ownership reports (13D, 13G)
-- Tender offers and merger documents
-- Bulk operations and company comparisons
-- Built-in self-testing for validation
-- Retry logic with exponential backoff
-- Rate limiting protection (SEC guidelines compliant)
-- Natural language query support
+- 23 SEC tools over the official EDGAR APIs
+- Any EDGAR form: 10-K, 10-Q, 8-K, 20-F, 6-K, DEF 14A, S-1, 424B4, 13D/13G, 3/4/5, 13F, N-PORT and more
+- Read any filing in pages, search inside it, or get the link only (size checked before download, 25MB text limit)
+- Full-text search across every EDGAR filing since 2001
+- XBRL financial data: company facts, single concepts, and one metric across all companies
+- Insider transactions (Form 4), 13D/13G holders, 13F institutional portfolios, recent IPOs
+- Network access limited to https://*.sec.gov, streamed size caps, rate limiting
+- Built-in self-test (28 checks)
 
 CRITICAL: SEC USER-AGENT REQUIREMENT
-The SEC requires all programmatic requests to include a User-Agent header that identifies 
+The SEC requires all programmatic requests to include a User-Agent header that identifies
 your company and provides a contact email. Failure to do so will result in a 403 Forbidden error.
-In this script, locate the `SEC_HEADERS` constant and update the "User-Agent" field with 
-your information (e.g., "MyCompany Name admin@example.com").
+Set the SEC_USER_AGENT environment variable (e.g., "MyCompany Name admin@example.com"),
+or edit the "User-Agent" field of the `SEC_HEADERS` constant in this script.
 
 EXAMPLE PROMPTS FOR AI:
 - "Get Apple's latest 10-K filing"
@@ -67,7 +53,7 @@ EXAMPLE PROMPTS FOR AI:
 
 TESTING:
 AI can self-test by asking: "Run self-test on SEC tools"
-This will test all 40+ functions and report results.
+This runs 28 checks across the 23 functions and reports results.
 """
 
 from typing import Callable, Any, Optional, List, Dict, Union, Tuple
@@ -736,7 +722,7 @@ class Tools:
     """
     SEC-AI Tools - Comprehensive SEC Filing Access Suite
 
-    This class provides 40+ tools for accessing SEC filings, company data,
+    This class provides 23 tools for accessing SEC filings, company data,
     insider trading information, and more through the SEC's EDGAR database.
     """
 
@@ -922,7 +908,7 @@ class Tools:
                 "ticker": validated_ticker,
                 "message": f"Could not find CIK for ticker '{validated_ticker}'",
                 "suggestion": f"Verify '{validated_ticker}' is a valid US stock ticker symbol",
-                "note": "Currently supporting 100+ major stocks. For other tickers, make sure the SEC has the company registered in EDGAR."
+                "note": "Any company registered in EDGAR resolves by ticker or by CIK. Check the symbol, or pass the numeric CIK."
             }
 
         try:
@@ -1210,8 +1196,9 @@ class Tools:
             if response.status_code != 200:
                 return {"error": f"Could not access filing: HTTP {response.status_code}"}
 
-            # Extract text
-            content = extract_text_from_html(response.text, max_length=5000)
+            # Extract text (first 5,000 characters, with how to read the rest)
+            preview = preview_with_guide(response.text, filing_url, 5000)
+            content = preview["content_preview"]
             summary = self._extract_8k_summary(content)
 
             logger.info(f"✓ 8-K analyzed for {filing['filing_date']}")
@@ -1224,7 +1211,7 @@ class Tools:
                 "accession": filing["accession_number"],
                 "events": summary["events"],
                 "summary": summary["key_text"],
-                "content_preview": content
+                **preview
             }
 
         except Exception as e:
@@ -1335,10 +1322,11 @@ class Tools:
     async def get_beneficial_ownership(self, ticker: str, limit: int = 10, schedule: str = "all") -> Dict[str, Any]:
         """
         Get beneficial ownership reports (13D, 13G) for a company.
-        
+
         Args:
             ticker: Stock ticker symbol
             limit: Number of reports to return
+            schedule: 'all' (default), '13D' (activist or control intent) or '13G' (passive holder)
             
         Returns:
             Dictionary containing beneficial ownership information
@@ -1820,7 +1808,9 @@ class Tools:
             limit: Number of top positions to return (default 25)
 
         Returns:
-            Report period, total value and the largest positions (issuer, CUSIP, value, shares)
+            Report period, total value, top_issuers (one row per company, share classes combined;
+            use this for "largest holdings") and top_positions (one row per security: CUSIP,
+            share class, put/call)
         """
         cik = ticker_to_cik(str(ticker_or_cik))
         if not cik:
@@ -1860,6 +1850,14 @@ class Tools:
         total = sum(p["value_usd"] for p in ranked)
         for p in ranked:
             p["weight_pct"] = round(100 * p["value_usd"] / total, 2) if total else None
+        issuers = {}
+        for p in ranked:
+            row = issuers.setdefault(p["issuer"], {"issuer": p["issuer"], "value_usd": 0.0, "securities": []})
+            row["value_usd"] += p["value_usd"]
+            row["securities"].append(p["class"] + (f" ({p['put_call']})" if p["put_call"] else ""))
+        by_issuer = sorted(issuers.values(), key=lambda p: p["value_usd"], reverse=True)
+        for p in by_issuer:
+            p["weight_pct"] = round(100 * p["value_usd"] / total, 2) if total else None
         return {
             "manager": data.get('name'),
             "cik": cik,
@@ -1867,10 +1865,14 @@ class Tools:
             "filing_date": recent['filingDate'][index],
             "report_period": (recent.get('reportDate') or [''] * len(forms))[index],
             "total_value_usd": total,
+            "total_issuers": len(by_issuer),
+            "top_issuers": by_issuer[:max(1, int(limit))],
             "total_positions": len(ranked),
             "top_positions": ranked[:max(1, int(limit))],
             "filing_folder": folder,
-            "note": "Values in US dollars as reported (filings before 2023 reported thousands)."
+            "note": ("top_issuers combines every share class, put and call of a company: use it for the largest "
+                     "holdings. top_positions lists each security (CUSIP) separately. Values in US dollars as "
+                     "reported (filings before 2023 reported thousands).")
         }
 
     @safe_sec_call
@@ -2483,10 +2485,11 @@ async def get_filing_content(ticker: str, filing_type: str = "10-Q", get_full_co
     - Minimal token usage - only fetch what you actually need
     - Example: specific_metrics=['NetIncomeLoss', 'InterestExpense', 'DepreciationDepletionAndAmortization']
 
-    FILE HANDLING:
-    - If get_full_content=True and file <1MB: Returns full text in full_content field
-    - If get_full_content=True and file ≥1MB: Provides filing_url + ai_note warning to user
-    - Always includes financial metrics via get_available_metrics() discovery
+    FILE HANDLING (get_full_content=True):
+    - Size is checked first from the EDGAR index
+    - Up to 25MB: first 50,000 characters in full_content; if has_more, continue with
+      download_filing_text(filing_url, offset=next_offset) or search it with search='keyword'
+    - Over 25MB: link only (file_too_large=True) with an ai_note
 
     WORKFLOW:
     1. Get available metrics: get_available_metrics(ticker='GME', search_term='Depreciation')

@@ -2,13 +2,11 @@
 
 ### AI-Powered SEC Filing Integration for Your AI Assistant
 
-**Natural Language SEC Integration** - Access 23 SEC filing tools directly from OpenWebUI, Claude, ChatGPT, or any AI assistant. Get 10-K, 10-Q, 8-K filings, 13D/13G beneficial ownership, insider trading data, company facts (XBRL), and institutional holdings via simple natural language queries.
+**Natural Language SEC Integration** - Access 23 SEC filing tools directly from OpenWebUI, OpenClaw, or any AI assistant with function calling. Get 10-K, 10-Q, 8-K filings, 13D/13G beneficial ownership, insider trading data, company facts (XBRL), and institutional holdings via simple natural language queries.
 
 **Author**: lucas0
 
 **Github**: [Github](https://github.com/lkcair/)
-
-**Version**: 1.4.2
 
 **License**: MIT
 
@@ -182,5 +180,4 @@ This runs 28 checks across all 23 functions and reports results with **100% pass
 
 *SEC-AI is not affiliated with the U.S. Securities and Exchange Commission. All data is sourced from public SEC databases with proper attribution.*
 
-*Version: 1.4.2*
 *Status: Production Ready ✅*
