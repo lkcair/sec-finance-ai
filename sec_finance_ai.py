@@ -4,7 +4,7 @@ description: Complete SEC Filing Data Suite - 23 tools for 10-K, 10-Q, 8-K, prox
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 1.4.1
+version: 1.4.2
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
@@ -683,6 +683,29 @@ def format_filing_date(date_str: str) -> str:
         return date_str
 
 
+def preview_with_guide(html_content: str, filing_url: str, preview_chars: int) -> Dict[str, Any]:
+    """First preview_chars of a filing plus how to read the rest (download_filing_text)"""
+    full = extract_text_from_html(html_content, max_length=len(html_content) + 1)
+    total = len(full)
+    partial = total > preview_chars
+    out = {
+        "content_preview": full[:preview_chars],
+        "preview_characters": min(preview_chars, total),
+        "total_characters": total,
+        "preview_is_partial": partial,
+    }
+    if partial:
+        out["read_more"] = (
+            f"The preview is only the first {preview_chars:,} of {total:,} characters (cover page and the first "
+            f"statements). It is NOT the whole filing. To read more, call download_filing_text("
+            f"filing_url='{filing_url}', offset={preview_chars}) and keep going with next_offset; or jump to a "
+            f"section with download_filing_text(filing_url=..., search='<phrase>'), e.g. search='medical care ratio', "
+            f"'Results of Operations', 'Item 7', 'Risk Factors'. Use max_length to fit your context window. Prefer "
+            f"figures the company reports in the text over figures you compute yourself."
+        )
+    return out
+
+
 def extract_text_from_html(html_content: str, max_length: int = 1000000) -> str:
     """Extract clean text from HTML content"""
     try:
@@ -991,13 +1014,18 @@ class Tools:
     @rate_limit()
     async def get_latest_10k(self, ticker: str) -> Dict[str, Any]:
         """
-        Get the latest 10-K filing for a company with content.
+        Get the latest 10-K filing for a company: filing link plus a SHORT preview of its text.
+
+        The preview is only the first 10,000 characters (cover page and first statements). When
+        preview_is_partial is true, follow read_more: download_filing_text(filing_url, offset=...) pages
+        through the rest, download_filing_text(filing_url, search='...') jumps to a section.
 
         Args:
             ticker: Stock ticker symbol
 
         Returns:
-            Dictionary containing 10-K filing with content preview
+            Dictionary with the 10-K filing: filing_url, content_preview, preview_characters,
+            total_characters, preview_is_partial and read_more
         """
         logger.info(f"=== get_latest_10k({ticker}) ===")
         result = await self.get_company_filings(ticker, form_type="10-K", limit=1)
@@ -1011,8 +1039,7 @@ class Tools:
         try:
             response = self.session.get(latest_10k["filing_url"], timeout=30)
             if response.status_code == 200:
-                content = extract_text_from_html(response.text, max_length=10000)
-                latest_10k["content_preview"] = content
+                latest_10k.update(preview_with_guide(response.text, latest_10k["filing_url"], 10000))
                 logger.info(f"✓ Retrieved 10-K content")
         except Exception as e:
             logger.debug(f"Could not extract content: {e}")
@@ -1027,13 +1054,18 @@ class Tools:
     @rate_limit()
     async def get_latest_10q(self, ticker: str) -> Dict[str, Any]:
         """
-        Get the latest 10-Q filing for a company with content.
+        Get the latest 10-Q filing for a company: filing link plus a SHORT preview of its text.
+
+        The preview is only the first 10,000 characters (cover page and first statements). When
+        preview_is_partial is true, follow read_more: download_filing_text(filing_url, offset=...) pages
+        through the rest, download_filing_text(filing_url, search='...') jumps to a section.
 
         Args:
             ticker: Stock ticker symbol
 
         Returns:
-            Dictionary containing 10-Q filing with content preview
+            Dictionary with the 10-Q filing: filing_url, content_preview, preview_characters,
+            total_characters, preview_is_partial and read_more
         """
         logger.info(f"=== get_latest_10q({ticker}) ===")
         result = await self.get_company_filings(ticker, form_type="10-Q", limit=1)
@@ -1047,8 +1079,7 @@ class Tools:
         try:
             response = self.session.get(latest_10q["filing_url"], timeout=30)
             if response.status_code == 200:
-                content = extract_text_from_html(response.text, max_length=10000)
-                latest_10q["content_preview"] = content
+                latest_10q.update(preview_with_guide(response.text, latest_10q["filing_url"], 10000))
                 logger.info(f"✓ Retrieved 10-Q content")
         except Exception as e:
             logger.debug(f"Could not extract content: {e}")
@@ -1063,14 +1094,18 @@ class Tools:
     @rate_limit()
     async def get_recent_8k_filings(self, ticker: str, limit: int = 5) -> Dict[str, Any]:
         """
-        Get recent 8-K filings for a company with content extraction.
+        Get recent 8-K filings for a company with a SHORT preview of each.
+
+        Each preview is only the first 5,000 characters. When preview_is_partial is true, follow
+        read_more: download_filing_text(filing_url, offset=...) or download_filing_text(filing_url, search='...').
 
         Args:
             ticker: Stock ticker symbol
             limit: Number of recent 8-K filings to return
 
         Returns:
-            Dictionary containing 8-K filing information including content preview
+            Dictionary with 8-K filings: filing_url, content_preview, preview_characters,
+            total_characters, preview_is_partial, read_more and extracted items
         """
         logger.info(f"=== get_recent_8k_filings({ticker}, limit={limit}) ===")
         result = await self.get_company_filings(ticker, form_type="8-K", limit=limit)
@@ -1089,8 +1124,8 @@ class Tools:
                 response = self.session.get(filing_url, timeout=30)
                 if response.status_code == 200:
                     # Extract text content from HTML
-                    content = extract_text_from_html(response.text, max_length=5000)
-                    enhanced_filing["content_preview"] = content
+                    enhanced_filing.update(preview_with_guide(response.text, filing_url, 5000))
+                    content = enhanced_filing["content_preview"]
 
                     # Try to extract key event items (Item 1-9 of 8-K)
                     try:
