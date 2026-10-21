@@ -8,7 +8,7 @@ AI-powered SEC EDGAR integration: 23 tools on the official sec.gov APIs, in one 
 
 | Use it in | Install | Repo |
 |---|---|---|
-| Claude, Cursor, VS Code and other MCP clients | `uvx sec-finance-ai@latest` | [sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp) |
+| Claude, Cursor, VS Code, [LangChain](https://docs.langchain.com/oss/python/langchain/mcp), [Google ADK](https://google.github.io/adk-docs/tools-custom/mcp-tools/), [Strands Agents](https://strandsagents.com/docs/user-guide/sdk/tools/mcp-tools/) and other MCP clients | `uvx sec-finance-ai@latest` | [sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp) |
 | ClawHub skill for OpenClaw 🚀 Thousands of downloads | `openclaw skills install @lkcair/sec` | [sec-ai-skill](https://github.com/lkcair/sec-ai-skill) |
 | OpenWebUI tool 🚀 Thousands of downloads | [Get it on openwebui.com](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585) | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
 | Python | `from sec_finance_ai import Tools` | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
@@ -20,7 +20,7 @@ AI-powered SEC EDGAR integration: 23 tools on the official sec.gov APIs, in one 
 ```bash
 claude mcp add sec-ai -e SEC_USER_AGENT="Your Name you@example.com" -- uvx sec-finance-ai@latest
 ```
-Setup for VS Code, Claude Desktop, Cursor and other clients: [sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
+Setup for VS Code, Claude Desktop, Cursor and other clients, plus LangChain, Google ADK and Strands Agents examples: [sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
 
 **ClawHub (OpenClaw)**
 ```bash

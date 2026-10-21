@@ -1,10 +1,10 @@
 """
 title: sec-finance-ai - AI-Powered SEC Filing Integration
-description: Complete SEC Filing Data Suite - 23 tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, OpenClaw, and any AI assistant with function calling.
+description: Complete SEC Filing Data Suite - 23 tools for 10-K, 10-Q, 8-K, proxy statements, insider trading, and more. Real-time SEC filings, financial statements, company facts, ownership data. Works with OpenWebUI, OpenClaw, MCP clients (Claude, Cursor, VS Code, LangChain, Google ADK, Strands Agents), and any AI assistant with function calling.
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 2.0.3
+version: 2.0.4
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
@@ -18,6 +18,7 @@ OPENWEBUI INSTALLATION:
 6. Start asking questions like "Get Apple's latest 10-K filing" or "Show Tesla's recent 8-K filings"
 
 OTHER WAYS TO USE IT:
+- MCP server (Claude, Cursor, VS Code, LangChain, Google ADK, Strands Agents): uvx sec-finance-ai@latest
 - OpenClaw: openclaw skills install @lkcair/sec
 - Python: from sec_finance_ai import Tools; tools = Tools()  (every tool is an async method)
 
