@@ -2,7 +2,7 @@
 
 ### AI-Powered SEC Filing Integration for Your AI Assistant
 
-**22 SEC EDGAR tools** for any AI assistant: 10-K, 10-Q, 8-K, 20-F and proxy filings, the full text of any filing read in pages or searched, XBRL company facts, insider trades, 13D/13G ownership, 13F institutional holdings, IPOs and EDGAR full-text search, through plain-language questions.
+**23 SEC EDGAR tools** for any AI assistant: 10-K, 10-Q, 8-K, 20-F and proxy filings, the full text of any filing read in pages or searched, XBRL company facts, insider trades, 13D/13G ownership, 13F institutional holdings, IPOs and EDGAR full-text search, through plain-language questions.
 
 Use it as an **MCP server** (Claude, Cursor, VS Code and any MCP client), an **OpenClaw skill** or an **OpenWebUI tool**.
 
@@ -40,7 +40,7 @@ claude mcp add sec-ai -e SEC_USER_AGENT="Your Name you@example.com" -- uvx sec-f
 
 Without uv: `pip install sec-finance-ai`, then use `"command": "sec-finance-ai"` with no args.
 
-All 22 tools are exposed, each marked read-only. Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.lkcair/sec-ai`. MCP server source: [lkcair/sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
+All tools are exposed over MCP, each marked read-only. Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.lkcair/sec-ai`. MCP server source: [lkcair/sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
 
 ## 🦞 OpenClaw (ClawHub): thousands of downloads
 
@@ -75,7 +75,7 @@ The SEC asks every program to identify itself with a name and contact e-mail. Se
 
 ## ✨ Why sec-finance-ai
 
-✅ **22 tools straight on the official EDGAR APIs**, no third-party data service and no API key
+✅ **23 tools straight on the official EDGAR APIs**, no third-party data service and no API key
 
 ✅ **One file, three platforms**: the same `sec_finance_ai.py` runs as MCP server, OpenClaw skill and OpenWebUI tool
 
@@ -130,7 +130,7 @@ The SEC asks every program to identify itself with a name and contact e-mail. Se
 
 ---
 
-## 🛠️ Available Tools (22)
+## 🛠️ Available Tools (23)
 
 ### Filings and text
 - get_company_filings - Filings of a company, filtered by form and date
@@ -160,6 +160,7 @@ The SEC asks every program to identify itself with a name and contact e-mail. Se
 
 ### Utility
 - get_sec_api_status - EDGAR API status
+- get_available_functions - List of every function
 - run_self_test - Self-test of all tools (28 checks)
 
 ---
