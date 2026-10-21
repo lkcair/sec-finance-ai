@@ -1,23 +1,18 @@
 # sec-finance-ai
 
-AI-powered SEC EDGAR integration: 23 tools on the official sec.gov APIs, in one Python file. Thousands of downloads on ClawHub and OpenWebUI.
+AI-powered SEC EDGAR integration: 23 tools on the official sec.gov APIs, in one Python file.
+
+🚀 **Thousands of downloads on ClawHub and OpenWebUI**
 
 10-K, 10-Q, 8-K, 20-F and proxy filings, the full text of any filing read in pages or searched, XBRL company facts and cross-company rankings, Form 4 insider trades, 13D/13G ownership, 13F fund portfolios, IPOs, and full-text search of every filing since 2001.
 
 | Use it in | Install | Repo |
 |---|---|---|
 | Claude, Cursor, VS Code and other MCP clients | `uvx sec-finance-ai@latest` | [sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp) |
-| OpenClaw, as a ClawHub skill (thousands of downloads) | `openclaw skills install @lkcair/sec` | [sec-ai-skill](https://github.com/lkcair/sec-ai-skill) |
-| OpenWebUI, as a tool (thousands of downloads) | [Get it on openwebui.com](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585) | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
+| ClawHub skill for OpenClaw 🚀 Thousands of downloads | `openclaw skills install @lkcair/sec` | [sec-ai-skill](https://github.com/lkcair/sec-ai-skill) |
+| OpenWebUI tool 🚀 Thousands of downloads | [Get it on openwebui.com](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585) | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
 | Python | `from sec_finance_ai import Tools` | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
 
-## Files
-
-`sec_finance_ai.py` holds all 23 tools. The same file is used everywhere:
-
-- OpenWebUI: paste [`sec_finance_ai.py`](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) as a tool.
-- ClawHub skill: `scripts/sec_finance_ai.py`, run by `scripts/cli.py`, with `SKILL.md` for the agent.
-- MCP: the `sec-finance-ai` package on PyPI, `sec_finance_ai.py` plus `sec_finance_ai_mcp.py`.
 
 ## Install
 
