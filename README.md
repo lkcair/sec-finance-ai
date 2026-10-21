@@ -1,175 +1,104 @@
-# sec-finance-ai 📊💼
+# sec-finance-ai
 
-### AI-Powered SEC Filing Integration for Your AI Assistant
+AI-powered SEC EDGAR integration: 23 tools on the official sec.gov APIs, in one Python file. Thousands of downloads on ClawHub and OpenWebUI.
 
-**23 SEC EDGAR tools** for any AI assistant: 10-K, 10-Q, 8-K, 20-F and proxy filings, the full text of any filing read in pages or searched, XBRL company facts, insider trades, 13D/13G ownership, 13F institutional holdings, IPOs and EDGAR full-text search, through plain-language questions.
+10-K, 10-Q, 8-K, 20-F and proxy filings, the full text of any filing read in pages or searched, XBRL company facts and cross-company rankings, Form 4 insider trades, 13D/13G ownership, 13F fund portfolios, IPOs, and full-text search of every filing since 2001.
 
-Use it as an **MCP server** (Claude, Cursor, VS Code and any MCP client), an **OpenClaw skill** or an **OpenWebUI tool**.
+| Use it in | Install | Repo |
+|---|---|---|
+| Claude, Cursor, VS Code and other MCP clients | `uvx sec-finance-ai@latest` | [sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp) |
+| OpenClaw, as a ClawHub skill (thousands of downloads) | `openclaw skills install @lkcair/sec` | [sec-ai-skill](https://github.com/lkcair/sec-ai-skill) |
+| OpenWebUI, as a tool (thousands of downloads) | [Get it on openwebui.com](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585) | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
+| Python | `from sec_finance_ai import Tools` | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
 
-[![PyPI](https://img.shields.io/pypi/v/sec-finance-ai)](https://pypi.org/project/sec-finance-ai/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## How it fits together
 
-Also try [yfinance-ai](https://github.com/lkcair/yfinance-ai) for stocks, crypto and market data. ⭐ Star the repo or the skill if you like it.
+[`sec_finance_ai.py`](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) is the whole toolkit: one file with a `Tools` class of async methods. Every platform runs that same file.
 
----
+```
+sec_finance_ai.py
+├── OpenWebUI   the file itself, added as a tool
+├── ClawHub     skill folder: SKILL.md, scripts/cli.py, scripts/sec_finance_ai.py
+└── MCP         PyPI package sec-finance-ai: sec_finance_ai.py and sec_finance_ai_mcp.py
+```
 
-# 🚀 Thousands of downloads on ClawHub and OpenWebUI
+In the skill, `cli.py` runs one function per command and `SKILL.md` tells the agent which function fits each question. In the MCP server, `sec_finance_ai_mcp.py` registers every method as an MCP tool, with its parameters documented.
 
-# 🚀 Quick Start
+## Install
 
-## 🔌 MCP server (Claude, Cursor, VS Code, any MCP client)
-
-Needs [uv](https://docs.astral.sh/uv/getting-started/installation/). No API key.
-
-**Claude Code**
+**MCP**
 ```bash
 claude mcp add sec-ai -e SEC_USER_AGENT="Your Name you@example.com" -- uvx sec-finance-ai@latest
 ```
+Setup for VS Code, Claude Desktop, Cursor and other clients: [sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
 
-**Claude Desktop, Cursor and other clients** (`claude_desktop_config.json`, `.cursor/mcp.json`, ...)
-```json
-{
-  "mcpServers": {
-    "sec-ai": {
-      "command": "uvx",
-      "args": ["sec-finance-ai@latest"],
-      "env": { "SEC_USER_AGENT": "Your Name you@example.com" }
-    }
-  }
-}
-```
-
-Without uv: `pip install sec-finance-ai`, then use `"command": "sec-finance-ai"` with no args.
-
-All tools are exposed over MCP, each marked read-only. Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.lkcair/sec-ai`. MCP server source: [lkcair/sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
-
-## 🦞 OpenClaw (ClawHub): thousands of downloads
-
+**ClawHub (OpenClaw)**
 ```bash
 openclaw skills install @lkcair/sec
 ```
-Skill page: [clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec). You can also download the skill there and upload it to your OpenClaw skills folder.
+Skill page: [clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec).
 
-## 🌐 OpenWebUI: thousands of downloads
+**OpenWebUI**
+1. Open the [OpenWebUI page](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585), click **Get** and save it in your OpenWebUI.
+2. Enable the tool on the model or in the chat.
 
-1. Open sec-finance-ai on the [OpenWebUI website](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585) and click **Get**.
-2. Select your OpenWebUI instance and click **Save** inside it.
-3. **Enable** the tool on the model or in the chat.
+Or copy [`sec_finance_ai.py`](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) into **Workspace > Tools > +** and save.
 
-Manual install: copy [sec_finance_ai.py](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py), go to **Workspace → Tools → +**, paste, **Save**, then enable it.
-
-## 🐍 Python
-
+**Python**
 ```python
 import asyncio
 from sec_finance_ai import Tools
-print(asyncio.run(Tools().get_latest_10k("AAPL")))  # every tool is an async method
+print(asyncio.run(Tools().get_latest_10k("AAPL")))
 ```
 
----
+Set `SEC_USER_AGENT` (for example `"Your Name you@example.com"`) to identify yourself to the SEC. If it is not set, a default is sent.
 
-## 🪪 SEC User-Agent
+## Tools (23)
 
-The SEC asks every program to identify itself with a name and contact e-mail. Set `SEC_USER_AGENT` (as in the examples above, e.g. `"MyResearchApp admin@example.com"`). If you don't, a built-in default is sent and everything still works, but your own keeps you clear of the SEC's fair-access limits.
+**Filings**
+- `get_company_filings`: Get SEC filings for a company by ticker symbol
+- `get_latest_10k`: Latest 10-K with a short preview of its text
+- `get_latest_10q`: Latest 10-Q with a short preview of its text
+- `get_recent_8k_filings`: Recent 8-K filings with a short preview of each
+- `analyze_8k_filing`: Get and summarize the latest 8-K filing for a company
+- `get_proxy_statements`: Get proxy statements (DEF 14A) for a company
+- `get_recent_ipos`: Get recent IPO activity from EDGAR
 
----
+**Reading inside a filing**
+- `get_filing_size`: Exact size of a filing document before downloading it
+- `download_filing_text`: Read a filing in 50,000-character pages, search inside it, or get the link when it is over 25 MB
+- `get_filing_documents`: List every document in a filing (main document, exhibits, XBRL, XML) with sizes and links
+- `get_filing_content`: Key financial figures from XBRL, or the full filing text in pages
 
-## ✨ Why sec-finance-ai
+**Search**
+- `full_text_search`: Search the full text of every EDGAR filing since 2001 (words or "exact phrase")
+- `search_filings`: Search SEC filings by company name or other criteria
 
-✅ **23 tools straight on the official EDGAR APIs**, no third-party data service and no API key
+**Ownership and insiders**
+- `get_insider_transactions`: Get insider trading transactions (Forms 3, 4, 5) for a company
+- `get_beneficial_ownership`: Get beneficial ownership reports (13D, 13G) for a company
+- `get_13f_holdings`: Get the latest 13F portfolio of an institutional investment manager
 
-✅ **One file, three platforms**: the same `sec_finance_ai.py` runs as MCP server, OpenClaw skill and OpenWebUI tool
+**Financial data (XBRL)**
+- `get_company_facts`: Get company facts from SEC XBRL data
+- `get_company_concept`: Get specific financial concept data for a company
+- `get_available_metrics`: Discover available financial metrics for a company from SEC XBRL data
+- `get_xbrl_frames`: One financial concept across all reporting companies for one period, ranked
 
-✅ **Read, search or link**: filing size checked first; read any filing in pages, search inside it for a phrase, or get the link for filings over 25 MB
+**Utility**
+- `get_sec_api_status`: Check SEC API status and connectivity
+- `get_available_functions`: List of every function
+- `run_self_test`: Run comprehensive self-test of all SEC-AI tools
 
-✅ **Full-text search** of every EDGAR filing since 2001 by word or exact phrase
+## Example questions
 
-✅ **13F holdings** of any institutional manager (e.g. Berkshire Hathaway) with weights
+- What does Apple's latest 10-K say about Greater China?
+- What are Berkshire Hathaway's top holdings in its latest 13F?
+- Find every 8-K this year that mentions 'going concern'.
+- Which companies had the highest revenue in 2024?
 
-✅ **Cross-company XBRL**: rank all companies by one metric for one period (e.g. 2024 revenue)
+See also [yfinance-ai](https://github.com/lkcair/yfinance-ai) for stocks, crypto and market data.
 
-✅ **Ownership and insiders**: 13D/13G with amendments, Forms 3, 4 and 5
+## License
 
-✅ **Foreign issuers**: 20-F, 6-K and 40-F
-
-✅ **Recent IPOs**: priced offerings (424B4) and new S-1/F-1 registrations
-
-✅ **Every release checked against real data**: each tool is called and its numbers compared with the filings
-
-✅ **Self-test**: ask the AI to "run self-test on SEC tools" (28 checks)
-
----
-
-## 📋 Supported SEC Forms
-
-| Form | Description | Use case |
-|------|-------------|----------|
-| **10-K / 20-F / 40-F** | Annual report (US / foreign / Canadian) | Business, financials, risks |
-| **10-Q** | Quarterly report | Quarterly financials and updates |
-| **8-K / 6-K** | Current report (US / foreign) | Material events |
-| **DEF 14A** | Proxy statement | Executive pay, shareholder votes |
-| **S-1 / F-1 / 424B4** | Registration and final prospectus | IPOs and offerings |
-| **S-8, S-3, S-4, 425** | Registrations and mergers | Employee plans, shelf offerings, combinations |
-| **D, 144** | Exempt offerings and sales | Private placements, proposed insider sales |
-| **3, 4, 5** | Insider trading | Officer and director transactions |
-| **13D / 13G** | Beneficial ownership | Positions above 5% |
-| **13F** | Institutional holdings | Quarterly manager portfolios |
-| **N-PORT** | Fund holdings | Monthly fund portfolios |
-| **ADV** | Investment adviser | RIA registrations |
-
----
-
-## 💬 Example prompts
-
-- "Get Apple's latest 10-K" / "What does it say about Greater China?"
-- "Show Tesla's recent 8-K filings" / "Taiwan Semiconductor's latest 20-F"
-- "Apple's revenue from SEC facts" / "Which companies had the highest revenue in 2024?"
-- "Recent insider trading for NVIDIA" / "Beneficial ownership reports for GameStop"
-- "Berkshire Hathaway's top holdings in its latest 13F"
-- "Search all 8-Ks from this year that mention \"going concern\""
-- "Show recent IPOs"
-
----
-
-## 🛠️ Available Tools (23)
-
-### Filings and text
-- get_company_filings - Filings of a company, filtered by form and date
-- get_latest_10k - Latest annual report with a preview and how to read the rest
-- get_latest_10q - Latest quarterly report
-- get_recent_8k_filings - Recent current reports
-- analyze_8k_filing - What an 8-K reports, item by item
-- get_proxy_statements - Proxy statements (DEF 14A)
-- get_filing_documents - Every document inside a filing
-- get_filing_size - Size of a filing before downloading
-- download_filing_text - Read a filing in pages, search inside it, or get the link
-- get_filing_content - Content of a filing document
-- search_filings - Filings across companies by form and date
-- full_text_search - EDGAR full-text search since 2001
-- get_recent_ipos - Priced IPOs and new registrations
-
-### Financial data (XBRL)
-- get_company_facts - Key financial facts of a company
-- get_company_concept - One metric over time
-- get_available_metrics - Which metrics a company reports
-- get_xbrl_frames - One metric across all companies for a period
-
-### Ownership and insiders
-- get_insider_transactions - Forms 3, 4 and 5
-- get_beneficial_ownership - 13D and 13G with amendments
-- get_13f_holdings - Institutional manager portfolio
-
-### Utility
-- get_sec_api_status - EDGAR API status
-- get_available_functions - List of every function
-- run_self_test - Self-test of all tools (28 checks)
-
----
-
-## 🔗 Related
-
-- [yfinance-ai](https://github.com/lkcair/yfinance-ai): Yahoo Finance in 68 tools
-- [SEC EDGAR API documentation](https://www.sec.gov/edgar/sec-api-documentation)
-
-MIT license. Author: lucas0.
-
-*sec-finance-ai is not affiliated with the U.S. Securities and Exchange Commission. All data comes from public SEC databases.*
+MIT. All data comes from public SEC EDGAR databases. Not affiliated with the U.S. Securities and Exchange Commission.
