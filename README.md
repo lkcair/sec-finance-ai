@@ -11,18 +11,13 @@ AI-powered SEC EDGAR integration: 23 tools on the official sec.gov APIs, in one 
 | OpenWebUI, as a tool (thousands of downloads) | [Get it on openwebui.com](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585) | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
 | Python | `from sec_finance_ai import Tools` | [sec-finance-ai](https://github.com/lkcair/sec-finance-ai) |
 
-## How it fits together
+## Files
 
-[`sec_finance_ai.py`](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) is the whole toolkit: one file with a `Tools` class of async methods. Every platform runs that same file.
+`sec_finance_ai.py` holds all 23 tools. The same file is used everywhere:
 
-```
-sec_finance_ai.py
-├── OpenWebUI   the file itself, added as a tool
-├── ClawHub     skill folder: SKILL.md, scripts/cli.py, scripts/sec_finance_ai.py
-└── MCP         PyPI package sec-finance-ai: sec_finance_ai.py and sec_finance_ai_mcp.py
-```
-
-In the skill, `cli.py` runs one function per command and `SKILL.md` tells the agent which function fits each question. In the MCP server, `sec_finance_ai_mcp.py` registers every method as an MCP tool, with its parameters documented.
+- OpenWebUI: paste [`sec_finance_ai.py`](https://github.com/lkcair/sec-finance-ai/blob/main/sec_finance_ai.py) as a tool.
+- ClawHub skill: `scripts/sec_finance_ai.py`, run by `scripts/cli.py`, with `SKILL.md` for the agent.
+- MCP: the `sec-finance-ai` package on PyPI, `sec_finance_ai.py` plus `sec_finance_ai_mcp.py`.
 
 ## Install
 
