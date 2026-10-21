@@ -22,7 +22,7 @@ Needs [uv](https://docs.astral.sh/uv/getting-started/installation/). No API key.
 
 **Claude Code**
 ```bash
-claude mcp add sec-ai -e SEC_USER_AGENT="Your Name you@example.com" -- uvx sec-finance-ai
+claude mcp add sec-ai -e SEC_USER_AGENT="Your Name you@example.com" -- uvx sec-finance-ai@latest
 ```
 
 **Claude Desktop, Cursor and other clients** (`claude_desktop_config.json`, `.cursor/mcp.json`, ...)
@@ -31,7 +31,7 @@ claude mcp add sec-ai -e SEC_USER_AGENT="Your Name you@example.com" -- uvx sec-f
   "mcpServers": {
     "sec-ai": {
       "command": "uvx",
-      "args": ["sec-finance-ai"],
+      "args": ["sec-finance-ai@latest"],
       "env": { "SEC_USER_AGENT": "Your Name you@example.com" }
     }
   }
