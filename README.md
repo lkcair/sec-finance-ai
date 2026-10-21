@@ -38,7 +38,7 @@ claude mcp add sec-ai -e SEC_USER_AGENT="Your Name you@example.com" -- uvx sec-f
 
 Without uv: `pip install sec-finance-ai`, then use `"command": "sec-finance-ai"` with no args.
 
-All 22 tools are exposed, each marked read-only. Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.lkcair/sec-ai`. MCP server source: [lkcair/finance-ai-mcp](https://github.com/lkcair/finance-ai-mcp/tree/main/sec-ai).
+All 22 tools are exposed, each marked read-only. Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.lkcair/sec-ai`. MCP server source: [lkcair/sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
 
 ## 🦞 OpenClaw (ClawHub)
 
