@@ -4,7 +4,7 @@ description: Complete SEC Filing Data Suite - 23 tools for 10-K, 10-Q, 8-K, prox
 author: lkcair
 author_url: https://github.com/lkcair
 funding_url: https://github.com/sponsors/lkcair
-version: 2.0.2
+version: 2.0.3
 license: MIT
 requirements: pandas>=2.2.0,pydantic>=2.0.0,requests>=2.28.0,beautifulsoup4>=4.12.0,lxml>=4.9.0,python-dateutil>=2.8.0
 repository: https://github.com/lkcair/sec-finance-ai
@@ -1023,10 +1023,12 @@ class Tools:
 
         # Extract content
         try:
-            response = self.session.get(latest_10k["filing_url"], timeout=30)
+            response = self.session.get(latest_10k["filing_url"], timeout=30, max_bytes=MAX_FILING_BYTES)
             if response.status_code == 200:
                 latest_10k.update(preview_with_guide(response.text, latest_10k["filing_url"], 10000))
                 logger.info(f"✓ Retrieved 10-K content")
+        except ResponseTooLargeError as e:
+            latest_10k.update(self._link_only(latest_10k["filing_url"], e.size, exact=False))
         except Exception as e:
             logger.debug(f"Could not extract content: {e}")
 
@@ -1063,10 +1065,12 @@ class Tools:
 
         # Extract content
         try:
-            response = self.session.get(latest_10q["filing_url"], timeout=30)
+            response = self.session.get(latest_10q["filing_url"], timeout=30, max_bytes=MAX_FILING_BYTES)
             if response.status_code == 200:
                 latest_10q.update(preview_with_guide(response.text, latest_10q["filing_url"], 10000))
                 logger.info(f"✓ Retrieved 10-Q content")
+        except ResponseTooLargeError as e:
+            latest_10q.update(self._link_only(latest_10q["filing_url"], e.size, exact=False))
         except Exception as e:
             logger.debug(f"Could not extract content: {e}")
 
@@ -1107,7 +1111,7 @@ class Tools:
             try:
                 filing_url = filing["filing_url"]
                 logger.debug(f"Fetching 8-K content from: {filing_url}")
-                response = self.session.get(filing_url, timeout=30)
+                response = self.session.get(filing_url, timeout=30, max_bytes=MAX_FILING_BYTES)
                 if response.status_code == 200:
                     # Extract text content from HTML
                     enhanced_filing.update(preview_with_guide(response.text, filing_url, 5000))
@@ -1124,6 +1128,8 @@ class Tools:
                         pass
 
                     logger.info(f"✓ Extracted content for {filing['filing_date']}")
+            except ResponseTooLargeError as e:
+                enhanced_filing.update(self._link_only(filing["filing_url"], e.size, exact=False))
             except Exception as e:
                 logger.debug(f"Could not extract 8-K content: {e}")
 
@@ -1191,7 +1197,11 @@ class Tools:
             # Get filing content
             filing_url = filing["filing_url"]
             logger.info(f"Fetching 8-K: {filing_url}")
-            response = self.session.get(filing_url, timeout=30)
+            try:
+                response = self.session.get(filing_url, timeout=30, max_bytes=MAX_FILING_BYTES)
+            except ResponseTooLargeError as e:
+                return {"ticker": ticker, "filing_date": filing.get("filing_date"),
+                        **self._link_only(filing_url, e.size, exact=False)}
 
             if response.status_code != 200:
                 return {"error": f"Could not access filing: HTTP {response.status_code}"}
