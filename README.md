@@ -4,13 +4,15 @@
 
 **22 SEC EDGAR tools** for any AI assistant: 10-K, 10-Q, 8-K, 20-F and proxy filings, the full text of any filing read in pages or searched, XBRL company facts, insider trades, 13D/13G ownership, 13F institutional holdings, IPOs and EDGAR full-text search, through plain-language questions.
 
-Use it as an **MCP server** (Claude, Cursor, VS Code and any MCP client), an **OpenClaw skill** or an **OpenWebUI tool**. Thousands of downloads on ClawHub and on OpenWebUI.
+Use it as an **MCP server** (Claude, Cursor, VS Code and any MCP client), an **OpenClaw skill** or an **OpenWebUI tool**.
 
 [![PyPI](https://img.shields.io/pypi/v/sec-finance-ai)](https://pypi.org/project/sec-finance-ai/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Also try [yfinance-ai](https://github.com/lkcair/yfinance-ai) for stocks, crypto and market data. ⭐ Star the repo or the skill if you like it.
 
 ---
+
+# 🚀 Thousands of downloads on ClawHub and OpenWebUI
 
 # 🚀 Quick Start
 
@@ -40,14 +42,14 @@ Without uv: `pip install sec-finance-ai`, then use `"command": "sec-finance-ai"`
 
 All 22 tools are exposed, each marked read-only. Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.lkcair/sec-ai`. MCP server source: [lkcair/sec-ai-mcp](https://github.com/lkcair/sec-ai-mcp).
 
-## 🦞 OpenClaw (ClawHub)
+## 🦞 OpenClaw (ClawHub): thousands of downloads
 
 ```bash
 openclaw skills install @lkcair/sec
 ```
 Skill page: [clawhub.ai/lkcair/sec](https://clawhub.ai/lkcair/sec). You can also download the skill there and upload it to your OpenClaw skills folder.
 
-## 🌐 OpenWebUI
+## 🌐 OpenWebUI: thousands of downloads
 
 1. Open sec-finance-ai on the [OpenWebUI website](https://openwebui.com/posts/sec_finance_ai_data_pull_8e017585) and click **Get**.
 2. Select your OpenWebUI instance and click **Save** inside it.
